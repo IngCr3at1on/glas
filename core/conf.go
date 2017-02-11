@@ -16,6 +16,7 @@ const (
 type (
 	character struct {
 		Name      string  `json:"name"`
+		Address   string  `json:"address"`
 		Password  []byte  `json:"password"`
 		AutoLogin chain   `json:"auto_login"`
 		Aliases   aliases `json:"aliases"`

@@ -32,20 +32,20 @@ func (e *entropy) handleChain(c chain) error {
 }
 
 func (e *entropy) handleAutoLogin(c *character) error {
-	if c.Name == "" {
-		return errors.New("autologin not possible: c.Name is not set")
-	}
-
-	if c.Password == nil {
-		return errors.New("autologin not possible: c.Password is not set")
-	}
-
 	for _, str := range c.AutoLogin {
 		if str == _user {
+			if c.Name == "" {
+				return errors.New("autologin not possible: c.Name is not set")
+			}
+
 			if err := e.send(c.Name); err != nil {
 				return errors.Wrap(err, "e.send")
 			}
 		} else if str == _pass {
+			if c.Password == nil {
+				return errors.New("autologin not possible: c.Password is not set")
+			}
+
 			if err := e.send(c.Password); err != nil {
 				return errors.Wrap(err, "e.send")
 			}

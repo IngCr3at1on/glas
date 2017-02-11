@@ -13,13 +13,14 @@ import (
 var (
 	cfgFile  string
 	charFile string
+	address  string
 
 	cmd = &cobra.Command{
 		Use:   "mudcig",
 		Short: "A simple MUD Client In Go",
 
 		Run: func(cmd *cobra.Command, args []string) {
-			core.Start(args[0])
+			core.Start(charFile, address)
 		},
 	}
 )
@@ -27,6 +28,7 @@ var (
 func init() {
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mudcig.yaml)")
 	cmd.Flags().StringVarP(&charFile, "charfile", "c", "", "define a character file to start with")
+	cmd.Flags().StringVarP(&address, "address", "a", "", "mud connection address")
 }
 
 func initConfig() {

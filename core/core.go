@@ -10,6 +10,7 @@ import (
 
 type (
 	entropy struct {
+		address string
 		*telnet.Conn
 
 		aliasesMutex *sync.Mutex
@@ -77,7 +78,7 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 }
 
 // Start starts the core client and bot services.
-func Start(file string) {
+func Start(file, address string) {
 	e := &entropy{
 		_aliases:     make(map[string]*alias),
 		aliasesMutex: &sync.Mutex{},
@@ -87,24 +88,39 @@ func Start(file string) {
 		roomMapMutex: &sync.Mutex{},
 	}
 
-	var err error
-	e.Conn, err = telnet.Dial("tcp", "216.69.243.18:443")
+	var (
+		char *character
+		err  error
+	)
+
+	if file != "" {
+		char, err = e.loadCharacter(file)
+		if err != nil {
+			fmt.Printf("error loading character file %s, loading blank character", file)
+		}
+	}
+
+	if char.Address != "" {
+		e.address = char.Address
+	}
+
+	// If address was passed, prefer it!
+	if address != "" {
+		e.address = address
+	}
+
+	if e.address == "" {
+		fmt.Println("Address required")
+		return
+	}
+
+	e.Conn, err = telnet.Dial("tcp", e.address)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
-	quit := make(chan struct{})
-	go e.handleInput(quit)
-	go e.handleConnection(quit)
-
-	if file != "" {
-		char, err := e.loadCharacter(file)
-		if err != nil {
-			fmt.Printf("error loading character file %s, loading blank character", file)
-			goto end
-		}
-
+	if char != nil {
 		if char.AutoLogin != nil {
 			if err := e.handleAutoLogin(char); err != nil {
 				fmt.Println(err.Error())
@@ -119,7 +135,10 @@ func Start(file string) {
 		}(char)
 	}
 
-end:
+	quit := make(chan struct{})
+	go e.handleInput(quit)
+	go e.handleConnection(quit)
+
 	e.roomMapMutex.Lock()
 	// Add the church to our map
 	// TODO save the map to db (and load here)
