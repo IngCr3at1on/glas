@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/IngCr3at1on/mudcig/core"
+	"github.com/IngCr3at1on/glas/core"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 	address  string
 
 	cmd = &cobra.Command{
-		Use:   "mudcig",
+		Use:   "glas",
 		Short: "A simple MUD Client In Go",
 
 		Run: func(cmd *cobra.Command, args []string) {
@@ -26,7 +26,7 @@ var (
 )
 
 func init() {
-	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mudcig.yaml)")
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.glas.yaml)")
 	cmd.Flags().StringVarP(&charFile, "charfile", "c", "", "define a character file to start with")
 	cmd.Flags().StringVarP(&address, "address", "a", "", "mud connection address")
 }
@@ -36,7 +36,7 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	viper.SetConfigName("..mudcig")
+	viper.SetConfigName("..glas")
 	viper.AddConfigPath("$HOME")
 	viper.AutomaticEnv()
 
