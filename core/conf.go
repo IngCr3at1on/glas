@@ -26,12 +26,12 @@ type (
 func (e *entropy) loadCharacter(file string) (*character, error) {
 	byt, err := ioutil.ReadFile(file)
 	if err != nil {
-		return &character{}, errors.Wrap(err, "ioutil.ReadFile")
+		return nil, errors.Wrap(err, "ioutil.ReadFile")
 	}
 
 	c := &character{}
 	if err = json.Unmarshal(byt, c); err != nil {
-		return &character{}, errors.Wrap(err, "json.Unmarshal")
+		return nil, errors.Wrap(err, "json.Unmarshal")
 	}
 
 	return c, nil

@@ -73,6 +73,9 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 				fmt.Println(err.Error())
 				return
 			}
+
+			// TODO reset ansi color back to default
+			// (should fix input line from having the ansi color for the last output line)
 		}
 	}
 }
@@ -100,7 +103,7 @@ func Start(file, address string) {
 		}
 	}
 
-	if char.Address != "" {
+	if char != nil && char.Address != "" {
 		e.address = char.Address
 	}
 

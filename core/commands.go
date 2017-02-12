@@ -65,12 +65,31 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 	e.aliasesMutex.Lock()
 	defer e.aliasesMutex.Unlock()
 
-	c, ok := e._aliases[input]
+	fields := strings.Fields(input)
+	c, ok := e._aliases[fields[0]]
 	if !ok {
 		return false, nil
 	}
 
-	if err := e.handleChain(c.Action); err != nil {
+	action := chain{}
+	for _, str := range c.Action {
+		if strings.Contains(str, "%s") {
+			if len(fields) > 1 {
+				/*
+					if i == 0 {
+						goto add
+					}
+				*/
+				str = fmt.Sprintf(str, fields[1])
+			} else {
+				str = strings.Fields(str)[0]
+			}
+		}
+		//add:
+		action = append(action, str)
+	}
+
+	if err := e.handleChain(action); err != nil {
 		return false, errors.Wrap(err, "handleChain")
 	}
 
