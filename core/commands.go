@@ -73,20 +73,28 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 
 	action := chain{}
 	for _, str := range c.Action {
+		// Ignores extra input fields beyond the number of wildcards in
+		// the match string.
+		// Should also cut off extra wildcards if an input field is not
+		// provided for it...
 		if strings.Contains(str, "%s") {
+			slice := strings.Fields(str)
 			if len(fields) > 1 {
-				/*
-					if i == 0 {
-						goto add
+				for i := range fields {
+					if i+1 > len(slice) {
+						break
 					}
-				*/
-				str = fmt.Sprintf(str, fields[1])
+					if i == 0 {
+						continue
+					}
+					str = fmt.Sprintf(str, fields[i])
+					action = append(action, str)
+				}
 			} else {
 				str = strings.Fields(str)[0]
+				action = append(action, str)
 			}
 		}
-		//add:
-		action = append(action, str)
 	}
 
 	if err := e.handleChain(action); err != nil {
@@ -101,6 +109,12 @@ func (e *entropy) handleCommand(input string, quit chan struct{}) error {
 		input = strings.TrimFunc(input, func(c rune) bool {
 			return !unicode.IsLetter(c)
 		})
+
+		if strings.Compare(input, "connect") == 0 {
+			if err := e.connect(quit); err != nil {
+				return errors.Wrap(err, "connect")
+			}
+		}
 
 		/*
 			if strings.Compare(input, "here") == 0 {

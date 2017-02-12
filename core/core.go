@@ -1,10 +1,10 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/ziutek/telnet"
 )
 
@@ -12,6 +12,8 @@ type (
 	entropy struct {
 		address string
 		*telnet.Conn
+
+		char *character
 
 		aliasesMutex *sync.Mutex
 		_aliases     aliases
@@ -80,6 +82,39 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 	}
 }
 
+func (e *entropy) connect(quit chan struct{}) error {
+	var err error
+	e.Conn, err = telnet.Dial("tcp", e.address)
+	if err != nil {
+		return errors.Wrap(err, "telnet.Dial")
+	}
+
+	if e.char != nil {
+		if e.char.AutoLogin != nil {
+			if err := e.handleAutoLogin(e.char); err != nil {
+				return errors.Wrap(err, "handleAutoLogin")
+			}
+		}
+
+		func(c *character) {
+			e.aliasesMutex.Lock()
+			defer e.aliasesMutex.Unlock()
+			e._aliases = c.Aliases
+		}(e.char)
+	}
+
+	// Ensure that we only start our handleConnection thread once
+	// this way if we disconnect/reconnect we don't have multiple
+	// go routines attempting to read the connection.
+	_connect := func() {
+		go e.handleConnection(quit)
+	}
+	var once sync.Once
+	once.Do(_connect)
+
+	return nil
+}
+
 // Start starts the core client and bot services.
 func Start(file, address string) {
 	e := &entropy{
@@ -92,19 +127,18 @@ func Start(file, address string) {
 	}
 
 	var (
-		char *character
-		err  error
+		err error
 	)
 
 	if file != "" {
-		char, err = e.loadCharacter(file)
+		e.char, err = e.loadCharacter(file)
 		if err != nil {
 			fmt.Printf("error loading character file %s, loading blank character", file)
 		}
 	}
 
-	if char != nil && char.Address != "" {
-		e.address = char.Address
+	if e.char != nil && e.char.Address != "" {
+		e.address = e.char.Address
 	}
 
 	// If address was passed, prefer it!
@@ -117,30 +151,13 @@ func Start(file, address string) {
 		return
 	}
 
-	e.Conn, err = telnet.Dial("tcp", e.address)
-	if err != nil {
+	// TODO make this part of our struct instead of passing it everywhere.
+	quit := make(chan struct{})
+	if err = e.connect(quit); err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-
-	if char != nil {
-		if char.AutoLogin != nil {
-			if err := e.handleAutoLogin(char); err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-		}
-
-		func(c *character) {
-			e.aliasesMutex.Lock()
-			defer e.aliasesMutex.Unlock()
-			e._aliases = char.Aliases
-		}(char)
-	}
-
-	quit := make(chan struct{})
 	go e.handleInput(quit)
-	go e.handleConnection(quit)
 
 	e.roomMapMutex.Lock()
 	// Add the church to our map
