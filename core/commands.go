@@ -73,10 +73,21 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 
 	action := chain{}
 	for _, str := range c.Action {
+		if len(fields) == 1 {
+			if strings.Contains(str, "%s") {
+				str = strings.Fields(str)[0]
+			}
+			action = append(action, str)
+			break
+		}
 		// Ignores extra input fields beyond the number of wildcards in
 		// the match string.
 		// Should also cut off extra wildcards if an input field is not
 		// provided for it...
+		// Currently only works with single wildcard statements:
+		// `<alias> <wildcard>`
+		// not
+		// `<alias> <wildcard> <wildcard>`
 		if strings.Contains(str, "%s") {
 			slice := strings.Fields(str)
 			if len(fields) > 1 {
@@ -90,9 +101,6 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 					str = fmt.Sprintf(str, fields[i])
 					action = append(action, str)
 				}
-			} else {
-				str = strings.Fields(str)[0]
-				action = append(action, str)
 			}
 		}
 	}
@@ -118,16 +126,16 @@ func (e *entropy) handleCommand(input string, quit chan struct{}) error {
 
 		/*
 			if strings.Compare(input, "here") == 0 {
-				os.Stdout.WriteString(fmt.Sprintf("%d\n", e.here))
+				fmt.Println(e.here)
 			}
 
 			if strings.Compare(input, "wander") == 0 {
-				os.Stdout.WriteString("wander enabled\n")
+				fmt.Println("wander enabled")
 				e._wander = true
 			}
 
 			if strings.Compare(input, "stop") == 0 {
-				os.Stdout.WriteString("wander stopped\n")
+				fmt.Println("wander stopped")
 				e._wander = false
 			}
 
