@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -64,12 +65,13 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 				return
 			}
 
-			/*
-				if _, err := os.Stdout.WriteString(fmt.Sprintf("%s", data)); err != nil {
-					fmt.Println(err.Error())
-					return
-				}
-			*/
+			data = strings.TrimFunc(data, func(c rune) bool {
+				return c == '\r' || c == '\n'
+			})
+
+			// Strip out the background color for printing.
+			// TODO possibly control this by a setting?
+			fmt.Println(stripAnsi(data, bg))
 
 			if err := e.observe(data); err != nil {
 				fmt.Println(err.Error())

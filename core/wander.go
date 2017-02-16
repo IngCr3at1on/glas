@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,11 +33,11 @@ func (e *entropy) wander(quit chan struct{}) {
 				r, ok := e.roomMap[e.here]
 				if !ok {
 					e._wander = false
-					os.Stdout.WriteString("I am lost...\n")
+					fmt.Println("I am lost...")
 				}
 
 				if err := e.doRandomMove(r.exits); err != nil {
-					os.Stdout.WriteString(err.Error())
+					fmt.Println(err.Error())
 					return
 				}
 			}
