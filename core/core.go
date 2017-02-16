@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/ziutek/telnet"
+
+	"github.com/IngCr3at1on/glas/ansi"
 )
 
 type (
@@ -71,7 +73,7 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 
 			// Strip out the background color for printing.
 			// TODO possibly control this by a setting?
-			fmt.Println(stripAnsi(data, bg))
+			fmt.Println(ansi.Strip(data, ansi.Bg))
 
 			if err := e.observe(data); err != nil {
 				fmt.Println(err.Error())
