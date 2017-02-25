@@ -2,9 +2,9 @@ package core
 
 import (
 	"io/ioutil"
+	"strings"
 
-	"encoding/json"
-
+	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 )
 
@@ -14,24 +14,38 @@ const (
 )
 
 type (
-	character struct {
-		Name      string  `json:"name"`
-		Address   string  `json:"address"`
-		Password  []byte  `json:"password"`
-		AutoLogin chain   `json:"auto_login"`
-		Aliases   aliases `json:"aliases"`
+	// Conf base toml conf
+	conf struct {
+		Character characterConf
+		Connect   connectConf
+		Aliases   aliases
+	}
+	// CharacterConf character related sub-sections from toml conf
+	characterConf struct {
+		Name string
+		//Password []byte
+		Password string // toml-compat... []byte was bad enough but this is terribad...
+	}
+	// ConnectConf connection related sub-sections from toml conf
+	connectConf struct {
+		Address   string
+		AutoLogin chain `toml:"auto_login"`
 	}
 )
 
-func (e *entropy) loadCharacter(file string) (*character, error) {
+func (e *entropy) loadCharacter(file string) (*conf, error) {
 	byt, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "ioutil.ReadFile")
 	}
 
-	c := &character{}
-	if err = json.Unmarshal(byt, c); err != nil {
-		return nil, errors.Wrap(err, "json.Unmarshal")
+	c := &conf{}
+	if strings.HasSuffix(file, ".toml") {
+		if _, err := toml.Decode(string(byt), c); err != nil {
+			return nil, errors.Wrap(err, "toml.Decode")
+		}
+	} else {
+		return nil, errors.New("Unrecognized file type, expected .toml")
 	}
 
 	return c, nil

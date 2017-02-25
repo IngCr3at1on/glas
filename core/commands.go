@@ -31,22 +31,22 @@ func (e *entropy) handleChain(c chain) error {
 	return nil
 }
 
-func (e *entropy) handleAutoLogin(c *character) error {
-	for _, str := range c.AutoLogin {
+func (e *entropy) handleAutoLogin(c *conf) error {
+	for _, str := range c.Connect.AutoLogin {
 		if str == _user {
-			if c.Name == "" {
-				return errors.New("autologin not possible: c.Name is not set")
+			if c.Character.Name == "" {
+				return errors.New("autologin not possible: c.Character.Name is not set")
 			}
 
-			if err := e.send(c.Name); err != nil {
+			if err := e.send(c.Character.Name); err != nil {
 				return errors.Wrap(err, "e.send")
 			}
 		} else if str == _pass {
-			if c.Password == nil {
-				return errors.New("autologin not possible: c.Password is not set")
+			if c.Character.Password == "" {
+				return errors.New("autologin not possible: c.Character.Password is not set")
 			}
 
-			if err := e.send(c.Password); err != nil {
+			if err := e.send(c.Character.Password); err != nil {
 				return errors.Wrap(err, "e.send")
 			}
 		} else {

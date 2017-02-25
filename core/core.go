@@ -16,7 +16,7 @@ type (
 		address string
 		*telnet.Conn
 
-		char *character
+		conf *conf
 
 		aliasesMutex *sync.Mutex
 		_aliases     aliases
@@ -93,18 +93,18 @@ func (e *entropy) connect(quit chan struct{}) error {
 		return errors.Wrap(err, "telnet.Dial")
 	}
 
-	if e.char != nil {
-		if e.char.AutoLogin != nil {
-			if err := e.handleAutoLogin(e.char); err != nil {
+	if e.conf != nil {
+		if e.conf.Connect.AutoLogin != nil {
+			if err := e.handleAutoLogin(e.conf); err != nil {
 				return errors.Wrap(err, "handleAutoLogin")
 			}
 		}
 
-		func(c *character) {
+		func(c *conf) {
 			e.aliasesMutex.Lock()
 			defer e.aliasesMutex.Unlock()
 			e._aliases = c.Aliases
-		}(e.char)
+		}(e.conf)
 	}
 
 	// Ensure that we only start our handleConnection thread once
@@ -135,14 +135,14 @@ func Start(file, address string) {
 	)
 
 	if file != "" {
-		e.char, err = e.loadCharacter(file)
+		e.conf, err = e.loadCharacter(file)
 		if err != nil {
-			fmt.Printf("error loading character file %s, loading blank character", file)
+			fmt.Printf("%s\nloading character file %s, loading blank character file\n", err.Error(), file)
 		}
 	}
 
-	if e.char != nil && e.char.Address != "" {
-		e.address = e.char.Address
+	if e.conf != nil && e.conf.Connect.Address != "" {
+		e.address = e.conf.Connect.Address
 	}
 
 	// If address was passed, prefer it!
