@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"strings"
 
@@ -19,6 +20,9 @@ type (
 		Character characterConf
 		Connect   connectConf
 		Aliases   aliases
+
+		// Unexported, instance only settings.
+		filePath string
 	}
 	// CharacterConf character related sub-sections from toml conf
 	characterConf struct {
@@ -33,7 +37,7 @@ type (
 	}
 )
 
-func (e *entropy) loadCharacter(file string) (*conf, error) {
+func (e *entropy) loadConf(file string) (*conf, error) {
 	byt, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "ioutil.ReadFile")
@@ -49,4 +53,18 @@ func (e *entropy) loadCharacter(file string) (*conf, error) {
 	}
 
 	return c, nil
+}
+
+func (e *entropy) saveConf(c *conf) error {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return errors.Wrap(err, "json.Marshal")
+	}
+
+	// Only owner can read/write conf file.
+	if err = ioutil.WriteFile(c.filePath, byt, 600); err != nil {
+		return errors.Wrap(err, "iotuil.WriteFile")
+	}
+
+	return nil
 }

@@ -95,7 +95,7 @@ func init() {
 	appendMap(Bg)
 }
 
-// Strip accepts a string and an ansi code set returns the stripped string.
+// Strip accepts a string and an ansi code set and returns the stripped string.
 func Strip(data string, set map[string]string) string {
 	for _, ac := range set {
 		if strings.Contains(data, ac) {

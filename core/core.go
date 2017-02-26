@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/ziutek/telnet"
-
-	"github.com/IngCr3at1on/glas/ansi"
 )
 
 type (
@@ -16,26 +14,10 @@ type (
 		address string
 		*telnet.Conn
 
-		conf *conf
+		_conf *conf
 
 		aliasesMutex *sync.Mutex
 		_aliases     aliases
-
-		_wander      bool
-		roomMapMutex *sync.Mutex
-		roomMap      map[int64]room
-		here         int64
-	}
-
-	exit struct {
-		direction   string
-		destination int64
-	}
-
-	room struct {
-		id    int64
-		exits []exit
-		// TODO handle hidden exits
 	}
 )
 
@@ -67,13 +49,7 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 				return
 			}
 
-			data = strings.TrimFunc(data, func(c rune) bool {
-				return c == '\r' || c == '\n'
-			})
-
-			// Strip out the background color for printing.
-			// TODO possibly control this by a setting?
-			fmt.Println(ansi.Strip(data, ansi.Bg))
+			data = strings.TrimFunc(data, func(c rune) bool { return c == '\r' || c == '\n' })
 
 			if err := e.observe(data); err != nil {
 				fmt.Println(err.Error())
@@ -93,9 +69,9 @@ func (e *entropy) connect(quit chan struct{}) error {
 		return errors.Wrap(err, "telnet.Dial")
 	}
 
-	if e.conf != nil {
-		if e.conf.Connect.AutoLogin != nil {
-			if err := e.handleAutoLogin(e.conf); err != nil {
+	if e._conf != nil {
+		if e._conf.Connect.AutoLogin != nil {
+			if err := e.handleAutoLogin(e._conf); err != nil {
 				return errors.Wrap(err, "handleAutoLogin")
 			}
 		}
@@ -104,7 +80,7 @@ func (e *entropy) connect(quit chan struct{}) error {
 			e.aliasesMutex.Lock()
 			defer e.aliasesMutex.Unlock()
 			e._aliases = c.Aliases
-		}(e.conf)
+		}(e._conf)
 	}
 
 	// Ensure that we only start our handleConnection thread once
@@ -124,10 +100,6 @@ func Start(file, address string) {
 	e := &entropy{
 		_aliases:     make(map[string]*alias),
 		aliasesMutex: &sync.Mutex{},
-
-		_wander:      false,
-		roomMap:      make(map[int64]room),
-		roomMapMutex: &sync.Mutex{},
 	}
 
 	var (
@@ -135,14 +107,14 @@ func Start(file, address string) {
 	)
 
 	if file != "" {
-		e.conf, err = e.loadCharacter(file)
+		e._conf, err = e.loadConf(file)
 		if err != nil {
 			fmt.Printf("%s\nloading character file %s, loading blank character file\n", err.Error(), file)
 		}
 	}
 
-	if e.conf != nil && e.conf.Connect.Address != "" {
-		e.address = e.conf.Connect.Address
+	if e._conf != nil && e._conf.Connect.Address != "" {
+		e.address = e._conf.Connect.Address
 	}
 
 	// If address was passed, prefer it!
@@ -162,19 +134,6 @@ func Start(file, address string) {
 		return
 	}
 	go e.handleInput(quit)
-
-	e.roomMapMutex.Lock()
-	// Add the church to our map
-	// TODO save the map to db (and load here)
-	id := int64(len(e.roomMap)) + 1
-	e.roomMap[id] = room{
-		id:    id,
-		exits: []exit{exit{"s", id + 1}},
-	}
-	e.roomMapMutex.Unlock()
-	e.here = id
-
-	go e.wander(quit)
 
 	// Block until quit is called
 	<-quit

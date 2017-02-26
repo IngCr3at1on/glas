@@ -11,12 +11,6 @@ import (
 
 type (
 	chain []string
-
-	alias struct {
-		Action chain `json:"action"`
-	}
-
-	aliases map[string]*alias
 )
 
 func (e *entropy) handleChain(c chain) error {
@@ -61,92 +55,33 @@ func (e *entropy) handleAutoLogin(c *conf) error {
 	return nil
 }
 
-func (e *entropy) maybeHandleAlias(input string) (bool, error) {
-	e.aliasesMutex.Lock()
-	defer e.aliasesMutex.Unlock()
-
-	fields := strings.Fields(input)
-	c, ok := e._aliases[fields[0]]
-	if !ok {
-		return false, nil
-	}
-
-	action := chain{}
-	for _, str := range c.Action {
-		if len(fields) == 1 {
-			if strings.Contains(str, "%s") {
-				str = strings.Fields(str)[0]
-			}
-			action = append(action, str)
-			break
-		}
-		// Ignores extra input fields beyond the number of wildcards in
-		// the match string.
-		// Should also cut off extra wildcards if an input field is not
-		// provided for it...
-		// Currently only works with single wildcard statements:
-		// `<alias> <wildcard>`
-		// not
-		// `<alias> <wildcard> <wildcard>`
-		if strings.Contains(str, "%s") {
-			slice := strings.Fields(str)
-			if len(fields) > 1 {
-				for i := range fields {
-					if i+1 > len(slice) {
-						break
-					}
-					if i == 0 {
-						continue
-					}
-					str = fmt.Sprintf(str, fields[i])
-					action = append(action, str)
-				}
-			}
-		}
-	}
-
-	if err := e.handleChain(action); err != nil {
-		return false, errors.Wrap(err, "handleChain")
-	}
-
-	return true, nil
-}
-
 func (e *entropy) handleCommand(input string, quit chan struct{}) error {
 	if strings.HasPrefix(input, "/") {
+
 		input = strings.TrimFunc(input, func(c rune) bool {
-			return !unicode.IsLetter(c)
+			// Trim off any unexpected input
+			return unicode.IsSpace(c) || !unicode.IsLetter(c) && !unicode.IsNumber(c) && !unicode.IsSymbol(c) && c != '*'
 		})
 
-		if strings.Compare(input, "connect") == 0 {
+		switch {
+		case strings.HasPrefix(input, "add"), strings.HasPrefix(input, "set"):
+			input = strings.TrimPrefix(input, "add ")
+			input = strings.TrimPrefix(input, "set ")
+
+			if strings.HasPrefix(input, "alias ") {
+				e.newAlias(strings.TrimPrefix(input, "alias "))
+			}
+		case strings.HasPrefix(input, "alias"):
+			e.newAlias(strings.TrimPrefix(input, "alias "))
+		case strings.Compare(input, "connect") == 0:
 			if err := e.connect(quit); err != nil {
 				return errors.Wrap(err, "connect")
 			}
-		}
-
-		/*
-			if strings.Compare(input, "here") == 0 {
-				fmt.Println(e.here)
-			}
-
-			if strings.Compare(input, "wander") == 0 {
-				fmt.Println("wander enabled")
-				e._wander = true
-			}
-
-			if strings.Compare(input, "stop") == 0 {
-				fmt.Println("wander stopped")
-				e._wander = false
-			}
-
-			if strings.Compare(input, "goto sewers") == 0 {
-				if err := e.handleScript(goToSewers()); err != nil {
-					return err
-				}
-			}
-		*/
-		if strings.Compare(input, "quit") == 0 {
+		case strings.Compare(input, "quit") == 0:
+			// TODO delayed shutdown to make sure all go routines stop?
 			close(quit)
+		default:
+			fmt.Println("Unkown command")
 		}
 
 		return nil
