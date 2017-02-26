@@ -81,35 +81,32 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 
 // TODO make this support multi-line alias (may require some form of curses)
 func (e *entropy) newAlias(input string) {
-	return
-	/*
-		fields := strings.SplitN(input, " ", 2)
-		if len(fields) != 2 {
-			if al, ok := e._aliases[input]; ok {
-				fmt.Println(al.Action)
-			}
-			return
+	fields := strings.SplitN(input, " ", 2)
+	if len(fields) != 2 {
+		if al, ok := e._aliases[input]; ok {
+			fmt.Println(al.Action)
 		}
+		return
+	}
 
-		match := fields[0]
-		cmd := fields[1]
+	match := fields[0]
+	cmd := fields[1]
 
-		e.aliasesMutex.Lock()
-		defer e.aliasesMutex.Unlock()
+	e.aliasesMutex.Lock()
+	defer e.aliasesMutex.Unlock()
 
-		// Check if the alias exists and warn that it was overwritten if it did.
-		warn := ""
-		if al, ok := e._aliases[match]; ok {
-			warn = fmt.Sprintf("%s", al.Action)
+	// Check if the alias exists and warn that it was overwritten if it did.
+	warn := ""
+	if al, ok := e._aliases[match]; ok {
+		warn = fmt.Sprintf("%s", al.Action)
+	}
+
+	defer func(s string) {
+		if s != "" {
+			fmt.Printf("Warning: %s overwritten:%s\n", match, warn)
 		}
+	}(warn)
 
-		defer func(s string) {
-			if s != "" {
-				fmt.Printf("Warning: %s overwritten:%s\n", match, warn)
-			}
-		}(warn)
-
-		e._aliases[match] = &alias{Action: chain{cmd}}
-		fmt.Printf("%s set to %s\n", match, chain{cmd})
-	*/
+	e._aliases[match] = &alias{Action: cmd}
+	fmt.Printf("%s set to %s\n", match, cmd)
 }

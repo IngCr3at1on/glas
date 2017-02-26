@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/ziutek/telnet"
 )
@@ -45,7 +47,10 @@ func (e *entropy) handleConnection(quit chan struct{}) {
 		default:
 			data, err := e.Conn.ReadString('\n')
 			if err != nil {
-				fmt.Println(err.Error())
+				if err != io.EOF {
+					fmt.Println(err.Error())
+				}
+				fmt.Println("Disconnected.")
 				return
 			}
 
