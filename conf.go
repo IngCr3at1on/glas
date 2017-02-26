@@ -1,4 +1,4 @@
-package core
+package glas
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package core
+package glas
 
 import (
 	"fmt"
@@ -55,7 +55,7 @@ func (e *entropy) handleAutoLogin(c *conf) error {
 	return nil
 }
 
-func (e *entropy) handleCommand(input string, quit chan struct{}) error {
+func (e *entropy) handleCommand(input string) error {
 	if strings.HasPrefix(input, "/") {
 
 		input = strings.TrimFunc(input, func(c rune) bool {
@@ -74,14 +74,14 @@ func (e *entropy) handleCommand(input string, quit chan struct{}) error {
 		case strings.HasPrefix(input, "alias"):
 			e.newAlias(strings.TrimPrefix(input, "alias "))
 		case strings.Compare(input, "connect") == 0:
-			if err := e.connect(quit); err != nil {
+			if err := e.connect(); err != nil {
 				return errors.Wrap(err, "connect")
 			}
 		case strings.Compare(input, "quit") == 0:
 			// TODO delayed shutdown to make sure all go routines stop?
-			close(quit)
+			close(e._quit)
 		default:
-			fmt.Println("Unkown command")
+			fmt.Fprintln(e.ioout, "Unknown command")
 		}
 
 		return nil

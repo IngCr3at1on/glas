@@ -1,4 +1,4 @@
-package core
+package glas
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 
 	// TODO allow multi-field command matching.
 	fields := strings.SplitN(input, " ", 2)
-	// TODO allowing naming to be separate from the match argument.
+	// TODO allow naming to be separate from the match argument.
 	match := fields[0]
 	var args []string
 	if len(fields) > 1 {
