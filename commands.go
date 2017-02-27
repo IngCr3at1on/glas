@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/IngCr3at1on/glas/ansi"
 	"github.com/pkg/errors"
 )
 
@@ -13,10 +14,10 @@ type (
 	chain []string
 )
 
-func (e *entropy) handleChain(c chain) error {
+func (g *glas) handleChain(c chain) error {
 	for _, str := range c {
-		if err := e.send(str); err != nil {
-			return errors.Wrap(err, "e.send")
+		if err := g.send(str); err != nil {
+			return errors.Wrap(err, "g.send")
 		}
 
 		time.Sleep(time.Millisecond * 100)
@@ -25,10 +26,10 @@ func (e *entropy) handleChain(c chain) error {
 	return nil
 }
 
-func (e *entropy) handleCommand(input string) error {
+func (g *glas) handleCommand(input string) error {
 	// TODO allow setting this to a different color then normal text
 	// also allow this to be disabled
-	fmt.Fprintln(e.ioout, input)
+	fmt.Fprint(g.ioout, ansi.Strip(input, ansi.Codes))
 
 	if strings.HasPrefix(input, "/") {
 
@@ -43,31 +44,31 @@ func (e *entropy) handleCommand(input string) error {
 			input = strings.TrimPrefix(input, "set ")
 
 			if strings.HasPrefix(input, "alias ") {
-				e.newAlias(strings.TrimPrefix(input, "alias "))
+				g.newAlias(strings.TrimPrefix(input, "alias "))
 			}
 		case strings.HasPrefix(input, "alias"):
-			e.newAlias(strings.TrimPrefix(input, "alias "))
+			g.newAlias(strings.TrimPrefix(input, "alias "))
 		case strings.Compare(input, "connect") == 0:
-			if err := e.connect(); err != nil {
+			if err := g.connect(); err != nil {
 				return errors.Wrap(err, "connect")
 			}
 		case strings.Compare(input, "quit") == 0:
 			// TODO delayed shutdown to make sure all go routines stop?
-			close(e._quit)
+			close(g._quit)
 		default:
-			fmt.Fprintln(e.ioout, "Unknown command")
+			fmt.Fprintln(g.ioout, "Unknown command")
 		}
 
 		return nil
 	}
 
-	b, err := e.maybeHandleAlias(input)
+	b, err := g.maybeHandleAlias(input)
 	if err != nil {
 		return errors.Wrap(err, "maybeHandleAlias")
 	}
 
 	if !b {
-		if _, err := e.Conn.Write([]byte(fmt.Sprintf("%s\n", input))); err != nil {
+		if _, err := g.Conn.Write([]byte(fmt.Sprintf("%s\n", input))); err != nil {
 			return err
 		}
 	}

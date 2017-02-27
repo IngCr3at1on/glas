@@ -12,7 +12,7 @@ import (
 )
 
 type (
-	entropy struct {
+	glas struct {
 		address string
 		*telnet.Conn
 		iochan chan string
@@ -27,15 +27,15 @@ type (
 	}
 )
 
-func (e *entropy) send(i interface{}) error {
+func (g *glas) send(i interface{}) error {
 	var err error
 	switch i.(type) {
 	case []byte:
 		byt := i.([]byte)
 		byt = append(byt, '\n')
-		_, err = e.Conn.Write(byt)
+		_, err = g.Conn.Write(byt)
 	case string:
-		_, err = e.Conn.Write([]byte(fmt.Sprintf("%s\n", i.(string))))
+		_, err = g.Conn.Write([]byte(fmt.Sprintf("%s\n", i.(string))))
 	default:
 		err = errors.New("Invalid data type")
 	}
@@ -43,26 +43,26 @@ func (e *entropy) send(i interface{}) error {
 	return err
 }
 
-func (e *entropy) handleConnection() {
+func (g *glas) handleConnection() {
 	for {
 		select {
-		case <-e._quit:
+		case <-g._quit:
 			return
 		default:
-			data, err := e.Conn.ReadString('\n')
+			data, err := g.Conn.ReadString('\n')
 			if err != nil {
 				if err != io.EOF {
-					fmt.Fprintln(e.ioerr, err.Error())
+					fmt.Fprintln(g.ioerr, err.Error())
 				}
 
-				fmt.Fprintln(e.ioout, "Disconnected.")
+				fmt.Fprintln(g.ioout, "Disconnected.")
 				return
 			}
 
 			data = strings.TrimFunc(data, func(c rune) bool { return c == '\r' || c == '\n' })
 
-			if err := e.observe(data); err != nil {
-				fmt.Fprintln(e.ioerr, err.Error())
+			if err := g.observe(data); err != nil {
+				fmt.Fprintln(g.ioerr, err.Error())
 				return
 			}
 		}
@@ -73,7 +73,7 @@ func (e *entropy) handleConnection() {
 // so that they can be handled from a terminal or gui application.
 // While iochan handles input from the client.
 func Start(iochan chan string, ioout, ioerr io.Writer, file, address string, _quit chan struct{}) {
-	e := &entropy{
+	g := &glas{
 		iochan:       iochan,
 		ioout:        ioout,
 		ioerr:        ioerr,
@@ -84,38 +84,38 @@ func Start(iochan chan string, ioout, ioerr io.Writer, file, address string, _qu
 
 	var err error
 	if file != "" {
-		e._conf, err = e.loadConf(file)
+		g._conf, err = g.loadConf(file)
 		if err != nil {
-			fmt.Fprintf(e.ioerr, "%s\nloading character file %s, loading blank character file\n", err.Error(), file)
+			fmt.Fprintf(g.ioerr, "%s\nloading character file %s, loading blank character file\n", err.Error(), file)
 		}
 	}
 
-	if e._conf != nil && e._conf.Connect.Address != "" {
-		e.address = e._conf.Connect.Address
+	if g._conf != nil && g._conf.Connect.Address != "" {
+		g.address = g._conf.Connect.Address
 	}
 
 	// If address was passed, prefer it!
 	if address != "" {
-		e.address = address
+		g.address = address
 	}
 
-	if e.address == "" {
-		fmt.Fprintln(e.ioerr, errors.New("Address required"))
+	if g.address == "" {
+		fmt.Fprintln(g.ioerr, errors.New("Address required"))
 		return
 	}
 
-	if err = e.connect(); err != nil {
-		fmt.Fprintln(e.ioerr, err.Error())
+	if err = g.connect(); err != nil {
+		fmt.Fprintln(g.ioerr, err.Error())
 		return
 	}
 
 	for {
 		select {
-		case <-e._quit:
+		case <-g._quit:
 			return
-		case in := <-e.iochan:
-			if err := e.handleCommand(in); err != nil {
-				fmt.Fprintln(e.ioerr, errors.Wrap(err, "handleCommand"))
+		case in := <-g.iochan:
+			if err := g.handleCommand(in); err != nil {
+				fmt.Fprintln(g.ioerr, errors.Wrap(err, "handleCommand"))
 				return
 			}
 		}

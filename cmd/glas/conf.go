@@ -12,7 +12,7 @@ type (
 	conf struct {
 		InputAutoErase bool `toml:"input_auto_erase"`
 
-		// Unexported, not written to settings file.
+		// Unexported, not written to settings filg.
 		filePath string
 	}
 )

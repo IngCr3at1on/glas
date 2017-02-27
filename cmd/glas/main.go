@@ -149,7 +149,7 @@ func initKeybindings(gui *gocui.Gui) error {
 		return errors.Wrap(err, "gui.SetKeybinding")
 	}
 	if err := gui.SetKeybinding(_main, gocui.MouseWheelDown, gocui.ModNone, func(gui *gocui.Gui, view *gocui.View) error {
-		// TODO same as above...
+		// TODO same as abovg...
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "gui.SetKeybinding")

@@ -17,9 +17,9 @@ type (
 	aliases map[string]*alias
 )
 
-func (e *entropy) maybeHandleAlias(input string) (bool, error) {
-	e.aliasesMutex.Lock()
-	defer e.aliasesMutex.Unlock()
+func (g *glas) maybeHandleAlias(input string) (bool, error) {
+	g.aliasesMutex.Lock()
+	defer g.aliasesMutex.Unlock()
 
 	// TODO allow multi-field command matching.
 	fields := strings.SplitN(input, " ", 2)
@@ -31,7 +31,7 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 		args = strings.Fields(fields[1])
 	}
 
-	al, ok := e._aliases[match]
+	al, ok := g._aliases[match]
 	if !ok {
 		return false, nil
 	}
@@ -72,7 +72,7 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 		action = append(action, line)
 	}
 
-	if err := e.handleChain(action); err != nil {
+	if err := g.handleChain(action); err != nil {
 		return false, errors.Wrap(err, "handleChain")
 	}
 
@@ -80,10 +80,10 @@ func (e *entropy) maybeHandleAlias(input string) (bool, error) {
 }
 
 // TODO make this support multi-line alias (may require some form of curses)
-func (e *entropy) newAlias(input string) {
+func (g *glas) newAlias(input string) {
 	fields := strings.SplitN(input, " ", 2)
 	if len(fields) != 2 {
-		if al, ok := e._aliases[input]; ok {
+		if al, ok := g._aliases[input]; ok {
 			fmt.Println(al.Action)
 		}
 		return
@@ -92,12 +92,12 @@ func (e *entropy) newAlias(input string) {
 	match := fields[0]
 	cmd := fields[1]
 
-	e.aliasesMutex.Lock()
-	defer e.aliasesMutex.Unlock()
+	g.aliasesMutex.Lock()
+	defer g.aliasesMutex.Unlock()
 
 	// Check if the alias exists and warn that it was overwritten if it did.
 	warn := ""
-	if al, ok := e._aliases[match]; ok {
+	if al, ok := g._aliases[match]; ok {
 		warn = fmt.Sprintf("%s", al.Action)
 	}
 
@@ -107,6 +107,6 @@ func (e *entropy) newAlias(input string) {
 		}
 	}(warn)
 
-	e._aliases[match] = &alias{Action: cmd}
+	g._aliases[match] = &alias{Action: cmd}
 	fmt.Printf("%s set to %s\n", match, cmd)
 }

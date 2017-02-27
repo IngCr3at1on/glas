@@ -36,7 +36,7 @@ type (
 	}
 )
 
-func (e *entropy) loadConf(file string) (*conf, error) {
+func (g *glas) loadConf(file string) (*conf, error) {
 	byt, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrapf(err, "ioutil.ReadFile")
@@ -57,13 +57,13 @@ func (e *entropy) loadConf(file string) (*conf, error) {
 }
 
 /*
-func (e *entropy) saveConf(c *conf) error {
+func (g *glas) saveConf(c *conf) error {
 	byt, err := json.Marshal(c)
 	if err != nil {
 		return errors.Wrap(err, "json.Marshal")
 	}
 
-	// Only owner can read/write conf file.
+	// Only owner can read/write conf filg.
 	if err = ioutil.WriteFile(c.filePath, byt, 600); err != nil {
 		return errors.Wrap(err, "iotuil.WriteFile")
 	}
