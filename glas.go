@@ -69,50 +69,17 @@ func (e *entropy) handleConnection() {
 	}
 }
 
-func (e *entropy) connect() error {
-	var err error
-	e.Conn, err = telnet.Dial("tcp", e.address)
-	if err != nil {
-		return errors.Wrap(err, "telnet.Dial")
-	}
-
-	if e._conf != nil {
-		if e._conf.Connect.AutoLogin != nil {
-			if err := e.handleAutoLogin(e._conf); err != nil {
-				return errors.Wrap(err, "handleAutoLogin")
-			}
-		}
-
-		func(c *conf) {
-			e.aliasesMutex.Lock()
-			defer e.aliasesMutex.Unlock()
-			e._aliases = c.Aliases
-		}(e._conf)
-	}
-
-	// Ensure that we only start our handleConnection thread once
-	// this way if we disconnect/reconnect we don't have multiple
-	// go routines attempting to read the connection.
-	_connect := func() {
-		go e.handleConnection()
-	}
-	var once sync.Once
-	once.Do(_connect)
-
-	return nil
-}
-
 // Start starts the core services: ioerr and ioout returns all errors
 // so that they can be handled from a terminal or gui application.
 // While iochan handles input from the client.
-// TODO combines these into a single channel?
-func Start(iochan chan string, ioout, ioerr io.Writer, file, address string) {
+func Start(iochan chan string, ioout, ioerr io.Writer, file, address string, _quit chan struct{}) {
 	e := &entropy{
 		iochan:       iochan,
 		ioout:        ioout,
 		ioerr:        ioerr,
 		_aliases:     make(map[string]*alias),
 		aliasesMutex: &sync.Mutex{},
+		_quit:        _quit,
 	}
 
 	var err error
@@ -137,7 +104,6 @@ func Start(iochan chan string, ioout, ioerr io.Writer, file, address string) {
 		return
 	}
 
-	e._quit = make(chan struct{})
 	if err = e.connect(); err != nil {
 		fmt.Fprintln(e.ioerr, err.Error())
 		return

@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-
 	"io"
+	"os"
 
 	"github.com/IngCr3at1on/glas"
 	"github.com/spf13/cobra"
@@ -12,6 +11,8 @@ import (
 )
 
 var (
+	_quit chan struct{}
+
 	cfgFile  string
 	charFile string
 	address  string
@@ -25,7 +26,13 @@ var (
 		Short: "A simple MUD Client In Go",
 
 		Run: func(cmd *cobra.Command, args []string) {
-			glas.Start(iochan, ioout, ioerr, charFile, address)
+			_quit = make(chan struct{})
+			iochan = make(chan string)
+			ioout = os.Stdout
+			ioerr = os.Stderr
+
+			go handleInput()
+			glas.Start(iochan, ioout, ioerr, charFile, address, _quit)
 		},
 	}
 )
@@ -59,10 +66,5 @@ func errAndExit(err error) {
 }
 
 func main() {
-	iochan = make(chan string)
-	ioout = os.Stdout
-	ioerr = os.Stderr
-
-	go handleInput()
 	errAndExit(cmd.Execute())
 }

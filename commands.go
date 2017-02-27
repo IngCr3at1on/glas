@@ -25,37 +25,11 @@ func (e *entropy) handleChain(c chain) error {
 	return nil
 }
 
-func (e *entropy) handleAutoLogin(c *conf) error {
-	for _, str := range c.Connect.AutoLogin {
-		if str == _user {
-			if c.Character.Name == "" {
-				return errors.New("autologin not possible: c.Character.Name is not set")
-			}
-
-			if err := e.send(c.Character.Name); err != nil {
-				return errors.Wrap(err, "e.send")
-			}
-		} else if str == _pass {
-			if c.Character.Password == "" {
-				return errors.New("autologin not possible: c.Character.Password is not set")
-			}
-
-			if err := e.send(c.Character.Password); err != nil {
-				return errors.Wrap(err, "e.send")
-			}
-		} else {
-			if err := e.send(str); err != nil {
-				return errors.Wrap(err, "e.send")
-			}
-		}
-
-		time.Sleep(time.Millisecond * 100)
-	}
-
-	return nil
-}
-
 func (e *entropy) handleCommand(input string) error {
+	// TODO allow setting this to a different color then normal text
+	// also allow this to be disabled
+	fmt.Fprintln(e.ioout, input)
+
 	if strings.HasPrefix(input, "/") {
 
 		input = strings.TrimFunc(input, func(c rune) bool {

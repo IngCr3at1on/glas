@@ -1,7 +1,6 @@
 package glas
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"strings"
 
@@ -40,10 +39,12 @@ type (
 func (e *entropy) loadConf(file string) (*conf, error) {
 	byt, err := ioutil.ReadFile(file)
 	if err != nil {
-		return nil, errors.Wrap(err, "ioutil.ReadFile")
+		return nil, errors.Wrapf(err, "ioutil.ReadFile")
 	}
 
-	c := &conf{}
+	c := &conf{
+		filePath: file,
+	}
 	if strings.HasSuffix(file, ".toml") {
 		if _, err := toml.Decode(string(byt), c); err != nil {
 			return nil, errors.Wrap(err, "toml.Decode")
@@ -55,6 +56,7 @@ func (e *entropy) loadConf(file string) (*conf, error) {
 	return c, nil
 }
 
+/*
 func (e *entropy) saveConf(c *conf) error {
 	byt, err := json.Marshal(c)
 	if err != nil {
@@ -68,3 +70,4 @@ func (e *entropy) saveConf(c *conf) error {
 
 	return nil
 }
+*/
