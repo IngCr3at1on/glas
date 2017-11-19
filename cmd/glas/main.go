@@ -70,7 +70,7 @@ var (
 					case <-_quit:
 						return
 					default:
-						gui.Execute(func(gui *gocui.Gui) error {
+						gui.Update(func(gui *gocui.Gui) error {
 							return nil
 						})
 					}
