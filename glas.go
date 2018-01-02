@@ -2,122 +2,108 @@ package glas
 
 import (
 	"fmt"
-	"strings"
-	"sync"
-
 	"io"
+	"net"
+	"time"
 
 	"github.com/pkg/errors"
-	"github.com/ziutek/telnet"
+	"github.com/sirupsen/logrus"
 )
 
 type (
-	glas struct {
-		address string
-		*telnet.Conn
-		iochan chan string
-		ioout  io.Writer
-		ioerr  io.Writer
+	// Glas is our mud client.
+	Glas struct {
+		log *logrus.Entry
 
-		_conf *conf
-		_quit chan struct{}
+		out             io.Writer
+		characterConfig *CharacterConfig
+		conn            net.Conn
 
-		aliasesMutex *sync.Mutex
-		_aliases     aliases
+		errCh  chan error
+		stopCh chan error
 	}
 )
 
-func (g *glas) send(i interface{}) error {
-	var err error
-	switch i.(type) {
-	case []byte:
-		byt := i.([]byte)
-		byt = append(byt, '\n')
-		_, err = g.Conn.Write(byt)
-	case string:
-		_, err = g.Conn.Write([]byte(fmt.Sprintf("%s\n", i.(string))))
-	default:
-		err = errors.New("Invalid data type")
+// New returns a new instance of Glas.
+func New(characterConfig *CharacterConfig, out io.Writer, errCh, stopCh chan error, log *logrus.Entry) (*Glas, error) {
+	if characterConfig == nil {
+		return nil, errors.New("config cannot be nil")
 	}
 
-	return err
+	if out == nil {
+		return nil, errors.New("out cannot be nil")
+	}
+
+	if errCh == nil {
+		return nil, errors.New("errCh cannot be nil")
+	}
+
+	if stopCh == nil {
+		return nil, errors.New("stopCh cannot be nil")
+	}
+
+	if err := characterConfig.Validate(); err != nil {
+		return nil, errors.Wrap(err, "characterConfig.Validate")
+	}
+
+	if log == nil {
+		log = logrus.NewEntry(logrus.New())
+	}
+
+	return &Glas{
+		log:             log,
+		out:             out,
+		characterConfig: characterConfig,
+		errCh:           errCh,
+		stopCh:          stopCh,
+	}, nil
 }
 
-func (g *glas) handleConnection() {
-	for {
-		select {
-		case <-g._quit:
-			return
-		default:
-			data, err := g.Conn.ReadString('\n')
+// Start starts our mud client.
+func (g *Glas) Start() {
+	if err := g.connect(); err != nil {
+		g.errCh <- err
+		return
+	}
+}
+
+// Send data to the mud.
+func (g *Glas) Send(data ...interface{}) error {
+	g.log.WithFields(logrus.Fields{
+		"command": "Send",
+		"data":    data,
+	}).Debug("Called")
+
+	for i, d := range data {
+		switch d.(type) {
+		case []byte:
+			byt := d.([]byte)
+			byt = append(byt, '\n')
+			if _, err := g.conn.Write(byt); err != nil {
+				return err
+			}
+		case string:
+			str := d.(string)
+
+			ok, err := g.characterConfig.aliases.maybeHandleAlias(g, str)
 			if err != nil {
-				if err != io.EOF {
-					fmt.Fprintln(g.ioerr, err.Error())
+				return err
+			}
+
+			if !ok {
+				if _, err := g.conn.Write([]byte(fmt.Sprintf("%s\n", str))); err != nil {
+					return err
 				}
-
-				fmt.Fprintln(g.ioout, "Disconnected.")
-				return
 			}
-
-			data = strings.TrimFunc(data, func(c rune) bool { return c == '\r' || c == '\n' })
-
-			if err := g.observe(data); err != nil {
-				fmt.Fprintln(g.ioerr, err.Error())
-				return
-			}
+		default:
+			return errors.New("Invalid data type")
 		}
-	}
-}
 
-// Start starts the core services: ioerr and ioout returns all errors
-// so that they can be handled from a terminal or gui application.
-// While iochan handles input from the client.
-func Start(iochan chan string, ioout, ioerr io.Writer, file, address string, _quit chan struct{}) {
-	g := &glas{
-		iochan:       iochan,
-		ioout:        ioout,
-		ioerr:        ioerr,
-		_aliases:     make(map[string]*alias),
-		aliasesMutex: &sync.Mutex{},
-		_quit:        _quit,
-	}
-
-	var err error
-	if file != "" {
-		g._conf, err = g.loadConf(file)
-		if err != nil {
-			fmt.Fprintf(g.ioerr, "%s\nloading character file %s, loading blank character file\n", err.Error(), file)
+		if i+1 < len(data) {
+			// TODO: make this configurable.
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 
-	if g._conf != nil && g._conf.Connect.Address != "" {
-		g.address = g._conf.Connect.Address
-	}
-
-	// If address was passed, prefer it!
-	if address != "" {
-		g.address = address
-	}
-
-	if g.address == "" {
-		fmt.Fprintln(g.ioerr, errors.New("Address required"))
-		return
-	}
-
-	if err = g.connect(); err != nil {
-		fmt.Fprintln(g.ioerr, err.Error())
-		return
-	}
-
-	for {
-		select {
-		case <-g._quit:
-			return
-		case in := <-g.iochan:
-			if err := g.handleCommand(in); err != nil {
-				fmt.Fprintln(g.ioerr, errors.Wrap(err, "handleCommand"))
-				return
-			}
-		}
-	}
+	return nil
 }
