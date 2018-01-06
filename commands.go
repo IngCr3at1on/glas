@@ -9,6 +9,7 @@ import (
 
 const (
 	helpMsg = `Glas known commands:
+aliases     list the aliases for the current character (if a character is loaded)
 connect     connect to an address or use a character config to connect
 characters  lists any loaded characters you have by name
 help        shows this message
@@ -50,10 +51,12 @@ func (g *Glas) handleCommand(input string) (bool, error) {
 		if prefix := "connect"; strings.HasPrefix(input, prefix) {
 			input = strings.TrimSpace(strings.TrimPrefix(input, prefix))
 			if input == "" {
-				// FIXME: if a character has already been selected or an address already
-				// passed in previously, use it now instead of erroring.
-				fmt.Fprintf(g.out, connectUsageMsg)
-				return true, nil
+				if g.currentCharacter == nil {
+					fmt.Fprintf(g.out, connectUsageMsg)
+					return true, nil
+				}
+
+				input = g.currentCharacter.Name
 			}
 
 			if err := g.connect(input); err != nil {
@@ -67,6 +70,21 @@ func (g *Glas) handleCommand(input string) (bool, error) {
 			fmt.Fprint(g.out, "Characters:")
 			for _, c := range g.characters.getCharacters() {
 				fmt.Fprint(g.out, c.Name)
+			}
+
+			return true, nil
+		}
+
+		if strings.Compare(input, "aliases") == 0 {
+			if g.currentCharacter != nil {
+				fmt.Fprint(g.out, "Aliases:")
+				aliases := g.currentCharacter.aliases
+				aliases.RLock()
+				defer aliases.RUnlock()
+
+				for _, a := range aliases.m {
+					fmt.Fprint(g.out, fmt.Sprintf("    Match: %s\n    Action: %s", a.Match, a.Action))
+				}
 			}
 
 			return true, nil

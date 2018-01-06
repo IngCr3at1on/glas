@@ -43,7 +43,8 @@ type (
 		errCh  chan error
 		stopCh chan error
 
-		characters *characters
+		currentCharacter *CharacterConfig
+		characters       *characters
 	}
 )
 
@@ -132,13 +133,12 @@ func (g *Glas) Send(data ...interface{}) error {
 			return err
 		}
 
-		// FIXME:
-		// if !ok && g.characterConfig != nil {
-		// 	ok, err = g.characterConfig.aliases.maybeHandleAlias(g, str)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
+		if !ok && g.currentCharacter != nil {
+			ok, err = g.currentCharacter.aliases.maybeHandleAlias(g, str)
+			if err != nil {
+				return err
+			}
+		}
 
 		if !ok && g.conn != nil && g.conn.connected {
 			if _, err := g.conn.Write([]byte(fmt.Sprintf("%s\n", str))); err != nil {

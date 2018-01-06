@@ -44,7 +44,12 @@ func (g *Glas) connect(input string) error {
 		input = cc.Address
 	}
 
-	return g.conn.connect(input, cc)
+	if err := g.conn.connect(input, cc); err != nil {
+		return err
+	}
+
+	g.currentCharacter = cc
+	return nil
 }
 
 func (c *conn) connect(address string, cc *CharacterConfig) (err error) {
