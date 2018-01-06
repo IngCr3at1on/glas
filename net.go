@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,56 +14,96 @@ const (
 	_pass = "$pass"
 )
 
-func (g *Glas) connect() (err error) {
-	g.conn, err = net.Dial("tcp", g.characterConfig.Address)
-	if err != nil {
-		return errors.Wrap(err, "net.Dial")
+type (
+	conn struct {
+		net.Conn
+
+		connected bool
+		glas      *Glas
 	}
+)
+
+func (g *Glas) connect(input string) error {
+	if g.conn.connected {
+		return nil
+	}
+
+	// We were passed a file that may or may not already be loaded into our
+	// character map.
+	if strings.HasSuffix(input, ".toml") {
+		name, err := g.loadCharacterConfig(input)
+		if err != nil {
+			return errors.Wrap(err, "g.loadCharacterConfig")
+		}
+
+		input = name
+	}
+
+	cc := g.characters.getCharacter(input)
+	if cc != nil {
+		input = cc.Address
+	}
+
+	return g.conn.connect(input, cc)
+}
+
+func (c *conn) connect(address string, cc *CharacterConfig) (err error) {
+	if c.connected {
+		return nil
+	}
+
+	c.Conn, err = net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	c.connected = true
 
 	time.Sleep(time.Millisecond * 100)
 
-	if g.characterConfig.AutoLogin != nil {
-		if err := g.handleAutoLogin(); err != nil {
+	if cc != nil && cc.AutoLogin != nil {
+		if err := c.handleAutoLogin(cc); err != nil {
 			return errors.Wrap(err, "handleAutoLogin")
 		}
 	}
 
-	// Ensure that we only start out handleConnection thread once this way if
-	// we disconnect/reconnect we don't have multiple go-routines attempting
-	// to read the connection.
-	_connect := func() {
-		go g.handleConnection()
-	}
-	var once sync.Once
-	once.Do(_connect)
+	go c.handleConnection()
 
 	return nil
 }
 
-func (g *Glas) handleAutoLogin() error {
-	for _, str := range g.characterConfig.AutoLogin {
+func (c *conn) disconnect() {
+	if !c.connected {
+		return
+	}
+
+	_ = c.Conn.Close()
+	c.connected = false
+}
+
+func (c *conn) handleAutoLogin(cc *CharacterConfig) error {
+	for _, str := range cc.AutoLogin {
 		switch str {
 		case _user:
-			if g.characterConfig.Name == "" {
+			if cc.Name == "" {
 				return errors.New("autologin not possible: character name not set")
 			}
 
-			if err := g.Send(g.characterConfig.Name); err != nil {
+			if err := c.glas.Send(cc.Name); err != nil {
 				return errors.Wrap(err, "g.Send")
 			}
 		case _pass:
-			if g.characterConfig.Password == "" {
+			if cc.Password == "" {
 				return errors.New("autologin not possible: character password not set")
 			}
 
 			// TODO: decode/decrypt this from whatever value it's in (something other
 			// than plain text or what's the point)...
 
-			if err := g.Send(g.characterConfig.Password); err != nil {
+			if err := c.glas.Send(cc.Password); err != nil {
 				return errors.Wrap(err, "g.Send")
 			}
 		default:
-			if err := g.Send(str); err != nil {
+			if err := c.glas.Send(str); err != nil {
 				return errors.Wrap(err, "g.Send")
 			}
 		}
@@ -76,30 +115,34 @@ func (g *Glas) handleAutoLogin() error {
 	return nil
 }
 
-func (g *Glas) handleConnection() {
+func (c *conn) handleConnection() {
 	tag := "handleConnection"
 
-	rd := bufio.NewReader(g.conn)
+	rd := bufio.NewReader(c.Conn)
 
 	for {
 		select {
-		case <-g.stopCh:
-			break
+		case <-c.glas.stopCh:
+			return
 		default:
+			if !c.connected {
+				return
+			}
+
 			// FIXME: This doesn't quite work in all situations (zebedee login for example)...
 			in, err := rd.ReadString('\n')
 			if err != nil {
-				g.errCh <- errors.Wrap(err, tag)
-				break
+				c.glas.errCh <- errors.Wrap(err, tag)
+				return
 			}
 
 			in = strings.TrimFunc(in, func(c rune) bool {
 				return c == '\r' || c == '\n'
 			})
 
-			if err := g.observe(in); err != nil {
-				g.errCh <- errors.Wrap(err, tag)
-				break
+			if err := c.glas.observe(in); err != nil {
+				c.glas.errCh <- errors.Wrap(err, tag)
+				return
 			}
 		}
 	}
