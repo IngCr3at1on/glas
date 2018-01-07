@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type (
@@ -26,6 +27,10 @@ type (
 )
 
 func (a *aliases) maybeHandleAlias(g *Glas, input string) (bool, error) {
+	if input == "" {
+		return false, nil
+	}
+
 	a.RLock()
 	defer a.RUnlock()
 
@@ -39,10 +44,24 @@ func (a *aliases) maybeHandleAlias(g *Glas, input string) (bool, error) {
 		args = strings.Fields(fields[1])
 	}
 
-	al, ok := a.m[match]
-	if !ok {
+	var al *Alias
+	for _, _al := range a.m {
+		if strings.Contains(_al.Match, "*") && strings.HasPrefix(_al.Match, fmt.Sprintf("%s ", match)) {
+			al = _al
+		}
+		if _al.Match == match {
+			al = _al
+		}
+	}
+
+	if al == nil {
 		return false, nil
 	}
+
+	g.log.WithFields(logrus.Fields{
+		"match":  al.Match,
+		"action": al.Action,
+	}).Debug("Matched aliase")
 
 	if len(args) != strings.Count(al.Match, "*") {
 		return false, nil

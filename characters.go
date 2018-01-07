@@ -8,6 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type (
@@ -65,7 +66,7 @@ func (g *Glas) loadCharacterConfig(file string) (string, error) {
 		return "", errors.Wrap(err, "toml.Decode")
 	}
 
-	if err := config.Validate(); err != nil {
+	if err := config.Validate(g.log); err != nil {
 		return "", errors.Wrap(err, "Validate")
 	}
 
@@ -75,7 +76,7 @@ func (g *Glas) loadCharacterConfig(file string) (string, error) {
 
 // Validate a configuration, error if a required value is missing and set
 // defaults (if a value is not provided) when not required.
-func (c *CharacterConfig) Validate() error {
+func (c *CharacterConfig) Validate(log *logrus.Entry) error {
 	if c.Address == "" {
 		return errors.New("address cannot be empty")
 	}
@@ -85,6 +86,11 @@ func (c *CharacterConfig) Validate() error {
 	defer c.aliases.Unlock()
 
 	for k, v := range c.Aliases {
+		log.WithFields(logrus.Fields{
+			"key":    k,
+			"match":  v.Match,
+			"action": v.Action,
+		}).Debug("Loading alias")
 		if c.aliases.m == nil {
 			c.aliases.m = make(map[string]*Alias)
 		}

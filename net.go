@@ -138,6 +138,7 @@ func (c *conn) handleConnection() {
 			in, err := rd.ReadString('\n')
 			if err != nil {
 				c.glas.errCh <- errors.Wrap(err, tag)
+				c.connected = false
 				return
 			}
 
@@ -147,6 +148,7 @@ func (c *conn) handleConnection() {
 
 			if err := c.glas.observe(in); err != nil {
 				c.glas.errCh <- errors.Wrap(err, tag)
+				c.connected = false
 				return
 			}
 		}
