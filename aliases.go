@@ -36,7 +36,6 @@ func (a *aliases) maybeHandleAlias(g *Glas, input string) (bool, error) {
 
 	// TODO: allow multi-field command matching.
 	fields := strings.SplitN(input, " ", 2)
-	// TODO: allow naming to be separate from the match argument.
 	match := fields[0]
 	var args []string
 	if len(fields) > 1 {
@@ -58,14 +57,14 @@ func (a *aliases) maybeHandleAlias(g *Glas, input string) (bool, error) {
 		return false, nil
 	}
 
+	if len(args) != strings.Count(al.Match, "*") {
+		return false, nil
+	}
+
 	g.log.WithFields(logrus.Fields{
 		"match":  al.Match,
 		"action": al.Action,
 	}).Debug("Matched aliase")
-
-	if len(args) != strings.Count(al.Match, "*") {
-		return false, nil
-	}
 
 	var action []interface{}
 	for _, line := range al.Action {
