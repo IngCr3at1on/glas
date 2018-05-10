@@ -1,13 +1,14 @@
-package glas
+package glas // import "github.com/IngCr3at1on/glas"
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/IngCr3at1on/glas/internal"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -32,124 +33,46 @@ var (
 )
 
 type (
-	// Glas is our mud client.
+	// Glas is a mud client backend.
 	Glas struct {
-		log *logrus.Entry
-
-		out    io.Writer
 		config *Config
-		conn   *conn
-
-		errCh  chan error
-		stopCh chan error
-
-		currentCharacter *CharacterConfig
-		characters       *characters
 	}
 )
 
 // New returns a new instance of Glas.
-func New(config *Config, out io.Writer, errCh, stopCh chan error, log *logrus.Entry) (*Glas, error) {
-	if out == nil {
-		return nil, errors.New("out cannot be nil")
-	}
-
-	if errCh == nil {
-		return nil, errors.New("errCh cannot be nil")
-	}
-
-	if stopCh == nil {
-		return nil, errors.New("stopCh cannot be nil")
-	}
-
-	if config == nil {
-		config = &Config{}
-	}
-
+func New(config *Config) (*Glas, error) {
 	if err := config.Validate(); err != nil {
 		return nil, errors.Wrap(err, "config.Validate")
 	}
 
-	if log == nil {
-		log = logrus.NewEntry(logrus.New())
-	}
-
-	g := &Glas{
-		log:    log,
-		out:    out,
+	return &Glas{
 		config: config,
-		characters: &characters{
-			m: make(map[string]*CharacterConfig),
-		},
-		errCh:  errCh,
-		stopCh: stopCh,
-	}
-
-	g.conn = &conn{
-		glas: g,
-	}
-
-	if err := g.loadCharacterConfigs(); err != nil {
-		return nil, errors.Wrap(err, "loadCharacterConfigs")
-	}
-
-	return g, nil
+	}, nil
 }
 
-// Start starts our mud client.
-func (g *Glas) Start(connectArg string) {
-	fmt.Fprint(g.out, welcome)
-	fmt.Fprint(g.out, fmt.Sprintf("\nThe current command prefix is '%s', you may get help at any time using %shelp", g.config.CmdPrefix, g.config.CmdPrefix))
-
-	if connectArg != "" {
-		if err := g.connect(connectArg); err != nil {
-			g.errCh <- err
-			return
-		}
+// Connect to a mud passing the data through to the provided io.ReadWriter.
+func (g *Glas) Connect(ctx context.Context, addr string, rw io.ReadWriter) error {
+	if addr = strings.TrimSpace(addr); addr == "" {
+		return errors.New("addr cannot be empty")
 	}
-}
 
-// Send data to the mud.
-func (g *Glas) Send(data ...interface{}) error {
-	g.log.WithFields(logrus.Fields{
-		"command": "Send",
-		"data":    data,
-	}).Debug("Called")
+	if rw == nil {
+		return errors.New("rw cannot be nil")
+	}
 
-	for i, d := range data {
-		var str string
+	fmt.Fprintln(rw, welcome)
+	fmt.Fprintf(rw, "The current command prefix is '%s', you may get help at any time using %[1]shelp\n", g.config.CmdPrefix)
 
-		switch d.(type) {
-		case []byte:
-			str = string(d.([]byte))
-		case string:
-			str = d.(string)
-		default:
-			return errors.New("Invalid data type")
-		}
+	time.Sleep(100 * time.Millisecond)
 
-		ok, err := g.handleCommand(str)
-		if err != nil {
-			return err
-		}
+	// FIXME: This ctx should be a dial context and not the one used to control shutdown
+	conn, err := internal.Dial(ctx, addr)
+	if err != nil {
+		return errors.Wrap(err, "internal.Dial")
+	}
 
-		if !ok && g.currentCharacter != nil {
-			ok, err = g.currentCharacter.aliases.maybeHandleAlias(g, str)
-			if err != nil {
-				return err
-			}
-		}
-
-		if !ok && g.conn != nil && g.conn.connected {
-			if _, err := g.conn.Write([]byte(fmt.Sprintf("%s\n", str))); err != nil {
-				return err
-			}
-		}
-
-		if i+1 < len(data) {
-			// TODO: make this configurable.
-			time.Sleep(time.Millisecond * 100)
-		}
+	if err := conn.Listen(ctx, rw); err != nil {
+		return errors.Wrap(err, "conn.Listen")
 	}
 
 	return nil
