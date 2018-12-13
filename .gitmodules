@@ -1,9 +1,0 @@
-[submodule "cmd/rest/glas/internal/deps/labstack/echo"]
-	path = cmd/rest/glas/internal/deps/labstack/echo
-	url = git@github.com:labstack/echo.git
-[submodule "cmd/rest/glas/internal/deps/square/go-jose.v1"]
-	path = cmd/rest/glas/internal/deps/square/go-jose.v1
-	url = git@github.com:square/go-jose.git
-[submodule "cmd/rest/glas/internal/deps/JustAnotherOrganization/l5424"]
-	path = cmd/rest/glas/internal/deps/JustAnotherOrganization/l5424
-	url = git@github.com:JustAnotherOrganization/l5424.git

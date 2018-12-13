@@ -6,3 +6,6 @@
 !.gitignore
 
 *.toml
+_*
+.vscode
+
