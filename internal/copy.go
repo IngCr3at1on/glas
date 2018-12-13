@@ -1,18 +1,25 @@
 package internal
 
 import (
+	"bytes"
 	"io"
 )
 
-// Copy is a variant of io.Copy designed for our purposes.
-func Copy(dst io.Writer, src io.Reader) (written int64, err error) {
-	// A small buffer means many iterations but also that we don't
-	// have to wait for it to fill.
-	buf := make([]byte, 1)
+// copy is a variant of io.Copy designed for our purposes.
+func copy(dst io.Writer, src io.Reader, bufferSize uint, term bool) (written int64, err error) {
+	crlfBuffer := [2]byte{'\r', '\n'}
+
+	rbuf := make([]byte, bufferSize)
 	for {
-		nr, er := src.Read(buf)
+		nr, er := src.Read(rbuf)
 		if nr > 0 {
-			nw, ew := dst.Write(buf[:nr])
+			var buf bytes.Buffer
+			buf.Write(rbuf[:nr])
+			if term {
+				buf.Write(crlfBuffer[:])
+			}
+
+			nw, ew := dst.Write(buf.Bytes())
 			if nw > 0 {
 				written += int64(nw)
 			}
@@ -20,7 +27,7 @@ func Copy(dst io.Writer, src io.Reader) (written int64, err error) {
 				err = ew
 				break
 			}
-			if nr != nw {
+			if len(buf.Bytes()) != nw {
 				err = io.ErrShortWrite
 				break
 			}

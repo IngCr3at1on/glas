@@ -1,11 +1,5 @@
-*
 .*
-
-!/**/
-!*.*
-!.gitignore
-
-*.toml
 _*
-.vscode
+*.toml
 
+!.gitignore

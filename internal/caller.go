@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/pkg/errors"
@@ -47,42 +45,20 @@ func NewCaller(c *CallerConfig, errCh chan error) (*Caller, error) {
 
 // CallTELNET is called by the telnet client.
 func (c *Caller) CallTELNET(ctx telnet.Context, w telnet.Writer, r telnet.Reader) {
-	crlfBuffer := [2]byte{'\r', '\n'}
-
 	go func() {
-		rbuf := make([]byte, 1024)
-		for {
-			nr, err := c.in.Read(rbuf)
-			if nr > 0 {
-				var buf bytes.Buffer
-				buf.Write(rbuf[:nr])
-				buf.Write(crlfBuffer[:])
-
-				nw, ew := w.Write(buf.Bytes())
-				if ew != nil {
-					c.errCh <- errors.Wrap(err, "w.Write")
-					return
-				}
-
-				if len(buf.Bytes()) != nw {
-					c.errCh <- io.ErrShortWrite
-					return
-				}
-				if err != nil {
-					if err != io.EOF {
-						c.errCh <- err
-					}
-					break
-				}
-			}
+		// Large buffer, pretty sure larger than any mud can support anyway lol,
+		// terminate all copied data with \r\n.
+		_, err := copy(w, c.in, 1024, true)
+		if err != nil {
+			c.errCh <- errors.Wrap(err, "copy input")
+			return
 		}
-
-		fmt.Println("exiting input loop")
 	}()
 
-	// Handler output.
-	_, err := Copy(c.out, r)
+	// Handle output. A small buffer means many iterations but also that we
+	// don't have to wait for it to fill.
+	_, err := copy(c.out, r, 1, false)
 	if err != nil {
-		c.errCh <- errors.Wrap(err, "Copy")
+		c.errCh <- errors.Wrap(err, "copy output")
 	}
 }
