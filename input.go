@@ -1,7 +1,6 @@
 package glas
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"strings"
@@ -9,33 +8,39 @@ import (
 
 func (g *Glas) routineHandleInput(ctx context.Context, cancel context.CancelFunc) error {
 	// fmt.Println("routineHandleInput")
-	scanner := bufio.NewScanner(g.config.Input)
 
 	errCh := make(chan error, 1)
 	go func() {
-		for scanner.Scan() {
-			b, err := g.handleInput(cancel, scanner.Text())
-			if err != nil {
-				errCh <- err
-				return
-			}
-
-			if !b && g.connected {
-				nw, err := g.pipeW.Write(scanner.Bytes())
+		rbuf := make([]byte, 1024)
+		for {
+			nr, er := g.config.Input.Read(rbuf)
+			if nr > 0 {
+				byt := rbuf[:nr]
+				b, err := g.handleInput(cancel, string(byt))
 				if err != nil {
 					errCh <- err
 					return
 				}
 
-				if nw != len(scanner.Bytes()) {
-					errCh <- io.ErrShortWrite
-					return
+				if !b && g.connected {
+					nw, err := g.pipeW.Write(byt)
+					if err != nil {
+						errCh <- err
+						return
+					}
+
+					if nw != len(byt) {
+						errCh <- io.ErrShortWrite
+						return
+					}
 				}
 			}
-		}
-
-		if err := scanner.Err(); err != nil && err != io.EOF {
-			errCh <- err
+			if er != nil {
+				if er != io.EOF {
+					errCh <- er
+				}
+				break
+			}
 		}
 	}()
 
@@ -55,11 +60,13 @@ func (g *Glas) handleInput(cancel context.CancelFunc, input string) (bool, error
 	if strings.HasPrefix(input, g.config.CmdPrefix) {
 		input = strings.TrimPrefix(input, g.config.CmdPrefix)
 
-		switch input {
-		case "exit":
+		switch {
+		case strings.Compare(input, "exit") == 0:
 			cancel()
-		case "connect":
-			go g.startTelnet("216.69.243.18:7000")
+		case strings.HasPrefix(input, "connect"):
+			go g.startTelnet(
+				strings.TrimSpace(
+					strings.TrimPrefix(input, "connect")))
 		}
 
 		return true, nil

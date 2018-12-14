@@ -5,8 +5,8 @@ import (
 	"io"
 )
 
-// copy is a variant of io.Copy designed for our purposes.
-func copy(dst io.Writer, src io.Reader, bufferSize uint, term bool) (written int64, err error) {
+// Copy is a variant of io.Copy designed for our purposes.
+func Copy(dst io.Writer, src io.Reader, bufferSize uint, term bool) (written int64, err error) {
 	crlfBuffer := [2]byte{'\r', '\n'}
 
 	rbuf := make([]byte, bufferSize)

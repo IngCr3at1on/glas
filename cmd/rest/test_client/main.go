@@ -5,15 +5,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
-	"github.com/ingcr3at1on/glas"
+	"github.com/gorilla/websocket"
 )
 
-// Wrap our functionality to allow defer to work with exit.
+var usage = "Usage: %s <websocket address>\n"
+
 func _main() error {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
@@ -24,42 +25,26 @@ func _main() error {
 		cancel()
 	}()
 
-	inR, inW := io.Pipe()
+	var args []string
+	if args = os.Args[1:]; len(args) != 1 {
+		return fmt.Errorf(usage, os.Args[0])
+	}
 
-	g, err := glas.New(&glas.Config{
-		Input:  inR,
-		Output: os.Stdout,
-	})
+	_url := url.URL{Scheme: "ws", Host: args[0], Path: "/api/connect"}
+	fmt.Println("dialing " + _url.String())
+	conn, _, err := websocket.DefaultDialer.Dial(_url.String(), nil)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
-	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		if err := g.Start(ctx, cancel); err != nil {
-			errCh <- err
-			return
-		}
-	}()
-
-	// Don't put this in the waitgroup because it can and will continue running
-	// until we stop it.
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			nw, err := inW.Write(scanner.Bytes())
+			err = conn.WriteMessage(websocket.TextMessage, scanner.Bytes())
 			if err != nil {
 				errCh <- err
-				return
-			}
-
-			if nw != len(scanner.Bytes()) {
-				errCh <- io.ErrShortWrite
 				return
 			}
 		}
@@ -68,6 +53,18 @@ func _main() error {
 			if err != io.EOF {
 				errCh <- err
 			}
+		}
+	}()
+
+	go func() {
+		for {
+			_, byt, err := conn.ReadMessage()
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			fmt.Print(string(byt))
 		}
 	}()
 
@@ -80,8 +77,6 @@ func _main() error {
 		}
 	}
 
-	wg.Wait()
-	fmt.Println("exiting")
 	return nil
 }
 

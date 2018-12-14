@@ -26,30 +26,9 @@ func SetupRoutes(config *config.Config, g *echo.Group) error {
 	g.GET("/ready", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
-	g.GET("/test", makeTestHandler(config))
-	g.GET("/connect/:address", makeConnectHandler(config))
+	g.GET("/connect", makeConnectHandler(config))
 
 	return nil
-}
-
-func makeTestHandler(cfg *config.Config) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
-		if err != nil {
-			errMsg := "error upgrading request to websocket"
-			cfg.Logger.Log(x5424.Severity, l5424.ErrorLvl, errMsg, err.Error())
-			return echo.NewHTTPError(http.StatusInternalServerError, errMsg)
-		}
-		defer ws.Close()
-
-		if err := ws.WriteMessage(websocket.TextMessage, []byte("hello echo and gorilla websockets")); err != nil {
-			errMsg := "error writing to websocket"
-			cfg.Logger.Log(x5424.Severity, l5424.ErrorLvl, errMsg, err.Error())
-			return echo.NewHTTPError(http.StatusInternalServerError, errMsg)
-		}
-
-		return c.NoContent(http.StatusOK)
-	}
 }
 
 func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
@@ -77,6 +56,29 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		errCh := make(chan error, 1)
 		ctx, cancel := context.WithCancel(c.Request().Context())
 
+		// Read from Glas.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rbuf := make([]byte, 1)
+			for {
+				nr, er := outR.Read(rbuf)
+				if nr > 0 {
+					err = ws.WriteMessage(websocket.TextMessage, rbuf[:nr])
+					if err != nil {
+						errCh <- err
+						return
+					}
+				}
+				if er != nil {
+					if er != io.EOF {
+						errCh <- er
+					}
+					break
+				}
+			}
+		}()
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -85,42 +87,33 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 			}
 		}()
 
-		// Read from Glas.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				w, err := ws.NextWriter(websocket.TextMessage)
-				if err != nil {
-					errCh <- errors.Wrap(err, "ws.NextWriter")
-					return
-				}
-
-				if _, err := io.Copy(w, outR); err != nil {
-					errCh <- err
-				}
-			}
-		}()
-
 		// Write to Glas.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for {
-				_, r, err := ws.NextReader()
+				_, byt, err := ws.ReadMessage()
 				if err != nil {
-					errCh <- errors.Wrap(err, "ws.NextReader")
+					errCh <- errors.Wrap(err, "ws.ReadMessage")
 					return
 				}
 
-				if _, err := io.Copy(inW, r); err != nil {
+				w, err := inW.Write(byt)
+				if err != nil {
 					errCh <- err
+					return
+				}
+
+				if w != len(byt) {
+					errCh <- io.ErrShortWrite
 					return
 				}
 			}
 		}()
 
 		select {
+		case <-c.Request().Context().Done():
+			break
 		case <-ctx.Done():
 			break
 		case err := <-errCh:

@@ -48,7 +48,7 @@ func (c *Caller) CallTELNET(ctx telnet.Context, w telnet.Writer, r telnet.Reader
 	go func() {
 		// Large buffer, pretty sure larger than any mud can support anyway lol,
 		// terminate all copied data with \r\n.
-		_, err := copy(w, c.in, 1024, true)
+		_, err := Copy(w, c.in, 1024, true)
 		if err != nil {
 			c.errCh <- errors.Wrap(err, "copy input")
 			return
@@ -57,7 +57,7 @@ func (c *Caller) CallTELNET(ctx telnet.Context, w telnet.Writer, r telnet.Reader
 
 	// Handle output. A small buffer means many iterations but also that we
 	// don't have to wait for it to fill.
-	_, err := copy(c.out, r, 1, false)
+	_, err := Copy(c.out, r, 1, false)
 	if err != nil {
 		c.errCh <- errors.Wrap(err, "copy output")
 	}
