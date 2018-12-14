@@ -1,13 +1,15 @@
-package glas
+package glas // import "github.com/ingcr3at1on/glas"
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
-	"time"
+	"sync"
 
+	"github.com/ingcr3at1on/glas/internal"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	telnet "github.com/reiver/go-telnet"
 )
 
 var (
@@ -32,125 +34,112 @@ var (
 )
 
 type (
-	// Glas is our mud client.
+	// Glas is a mud client backend.
 	Glas struct {
-		log *logrus.Entry
-
-		out    io.Writer
-		config *Config
-		conn   *conn
-
-		errCh  chan error
-		stopCh chan error
-
-		currentCharacter *CharacterConfig
-		characters       *characters
+		config    *Config
+		errCh     chan error
+		terrCh    chan error
+		pipeW     *io.PipeWriter
+		pipeR     *io.PipeReader
+		connected bool
 	}
 )
 
 // New returns a new instance of Glas.
-func New(config *Config, out io.Writer, errCh, stopCh chan error, log *logrus.Entry) (*Glas, error) {
-	if out == nil {
-		return nil, errors.New("out cannot be nil")
-	}
-
-	if errCh == nil {
-		return nil, errors.New("errCh cannot be nil")
-	}
-
-	if stopCh == nil {
-		return nil, errors.New("stopCh cannot be nil")
-	}
-
-	if config == nil {
-		config = &Config{}
-	}
-
+func New(config *Config) (*Glas, error) {
 	if err := config.Validate(); err != nil {
 		return nil, errors.Wrap(err, "config.Validate")
 	}
 
-	if log == nil {
-		log = logrus.NewEntry(logrus.New())
-	}
-
-	g := &Glas{
-		log:    log,
-		out:    out,
+	g := Glas{
 		config: config,
-		characters: &characters{
-			m: make(map[string]*CharacterConfig),
-		},
-		errCh:  errCh,
-		stopCh: stopCh,
+		errCh:  make(chan error, 1),
+		terrCh: make(chan error),
 	}
 
-	g.conn = &conn{
-		glas: g,
-	}
+	g.pipeR, g.pipeW = io.Pipe()
 
-	if err := g.loadCharacterConfigs(); err != nil {
-		return nil, errors.Wrap(err, "loadCharacterConfigs")
-	}
-
-	return g, nil
+	return &g, nil
 }
 
-// Start starts our mud client.
-func (g *Glas) Start(connectArg string) {
-	fmt.Fprint(g.out, welcome)
-	fmt.Fprint(g.out, fmt.Sprintf("\nThe current command prefix is '%s', you may get help at any time using %shelp", g.config.CmdPrefix, g.config.CmdPrefix))
-
-	if connectArg != "" {
-		if err := g.connect(connectArg); err != nil {
-			g.errCh <- err
-			return
-		}
+// Start the Glas client.
+func (g *Glas) Start(ctx context.Context, cancel context.CancelFunc) error {
+	if ctx == nil {
+		return ErrNilContext
 	}
-}
 
-// Send data to the mud.
-func (g *Glas) Send(data ...interface{}) error {
-	g.log.WithFields(logrus.Fields{
-		"command": "Send",
-		"data":    data,
-	}).Debug("Called")
+	if cancel == nil {
+		return ErrNilCancelF
+	}
 
-	for i, d := range data {
-		var str string
+	fmt.Fprintln(g.config.Output, welcome)
+	// Add help and mention it here...
+	fmt.Fprintf(g.config.Output, "The current command prefix is '%s'\n", g.config.CmdPrefix)
 
-		switch d.(type) {
-		case []byte:
-			str = string(d.([]byte))
-		case string:
-			str = d.(string)
-		default:
-			return errors.New("Invalid data type")
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := g.routineHandleInput(ctx, cancel); err != nil {
+			g.errCh <- errors.Wrap(err, "routineHandleInput")
 		}
 
-		ok, err := g.handleCommand(str)
+		// fmt.Println("routineHandleInput finished")
+	}()
+
+	select {
+	case <-ctx.Done():
+		break
+	case err := <-g.errCh:
 		if err != nil {
 			return err
 		}
-
-		if !ok && g.currentCharacter != nil {
-			ok, err = g.currentCharacter.aliases.maybeHandleAlias(g, str)
-			if err != nil {
-				return err
+	case err := <-g.terrCh:
+		if err != nil {
+			n, _err := io.WriteString(g.config.Output, fmt.Sprintf("%s\n", err.Error()))
+			if _err != nil {
+				return _err
 			}
-		}
 
-		if !ok && g.conn != nil && g.conn.connected {
-			if _, err := g.conn.Write([]byte(fmt.Sprintf("%s\n", str))); err != nil {
-				return err
+			if n < len(err.Error()) {
+				return io.ErrShortWrite
 			}
-		}
-
-		if i+1 < len(data) {
-			// TODO: make this configurable.
-			time.Sleep(time.Millisecond * 100)
 		}
 	}
 
+	wg.Wait()
 	return nil
+}
+
+func (g *Glas) startTelnet(addr string) {
+	// FIXME: support tls
+	conn, err := telnet.DialTo(addr)
+	if err != nil {
+		g.terrCh <- err
+		return
+	}
+	defer conn.Close()
+
+	caller, err := internal.NewCaller(&internal.CallerConfig{
+		In:  g.pipeR,
+		Out: g.config.Output,
+	}, g.terrCh)
+	if err != nil {
+		g.terrCh <- err
+		return
+	}
+
+	client := telnet.Client{
+		Caller: caller,
+	}
+
+	g.connected = true
+
+	err = client.Call(conn)
+	if err != nil {
+		g.terrCh <- errors.Wrapf(err, "client.Call : %s", conn.RemoteAddr().String())
+		return
+	}
 }
