@@ -1,0 +1,179 @@
+
+<html>
+<head>
+	<title>NodeMUD</title>
+	<link href="https://fonts.googleapis.com/css?family=Inconsolata" rel="stylesheet">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<!--<link rel="stylesheet" media="screen" href="./css/terminal.css">-->
+	<style type="text/css">
+		html,body {
+	background-color: black;
+	color: white;
+	margin: 0;
+	padding: 0;
+}
+body {
+	overflow-y: scroll;
+}
+#output {
+	font-family: 'Inconsolata', monospace;
+	white-space: pre-wrap;
+	padding: 8px;
+}
+#input {
+	font-family: 'Inconsolata', monospace;
+	background-color: black;
+	color: white;
+	border: 0px;
+	padding: 8px;
+	width: 100%;
+}
+.fgblack {
+	color: black;
+}
+.fgred {
+	color: red;	
+}
+.fggreen {
+	color: green;
+}
+.fgyellow {
+	color: yellow;
+}
+.fgblue {
+	color: blue;
+}
+.fgmagenta {
+	color: magenta;
+}
+.fgcyan {
+	color: cyan;
+}
+.fgwhite {
+	color: white;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0A0A0A;
+}
+
+::-webkit-scrollbar-track:hover {
+    background: #7A7A7A;
+}
+ 
+::-webkit-scrollbar-thumb {
+    background: #1A1A1A;
+    border-radius:8px;
+    border: 2px solid #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #2A2A2A;
+    border: 2px solid #7A7A7A;
+}
+	</style>
+</head>
+<body>
+<div id="output"></div>
+<input type="text" id="input" autocomplete="off" />
+
+<script>
+	var localEcho = true;
+	var commandHistory = [];
+	var commandPointer = 0;
+function handleInstructions(instruction) {
+		switch(instruction) {
+			case "protectinput":
+			document.getElementById("input").attributes["type"].value = "password";
+			localEcho = false;
+			break;
+			case "openinput":
+			document.getElementById("input").attributes["type"].value = "text";
+			localEcho = true;
+			break;
+		}
+	}
+  window.WebSocket = window.WebSocket || window.MozWebSocket;
+//   var socketString = "ws://127.0.0.1:8080/api/connect";
+  var socketString = "ws://ingcr3at1on.online:8080/api/connect";
+  var connection = new WebSocket(socketString);
+
+  connection.onopen = function () {
+  };
+
+  connection.onerror = function (error) {
+  	console.error("Connection Error:", error);
+  };
+
+  connection.onmessage = function (message) {
+	  // FIXME: yeah I totally broke any and all safety here :P
+	try {
+		console.log(message);
+		// var json = JSON.parse(message.data);
+		// if(json.type == "output") {
+			// var text = document.createElement("div");
+			var text = document.createTextNode(message.data);
+			// text.innerHTML = json.data.trim();
+			document.getElementById("output").appendChild(text);
+			window.scrollTo(0,document.body.scrollHeight);
+		// }
+	} catch (e) {
+		console.error("This doesn't look like a valid JSON ", message.data);
+		return;
+	}
+	// handle incoming message
+	};
+	connection.onclose = function () {
+  	document.getElementById("output").innerHTML += "connection closed by host\n";
+  	window.scrollTo(0,document.body.scrollHeight);
+  	document.getElementById("input").disabled = true;
+  };
+
+document.addEventListener("keydown", function(event) {
+	document.getElementById("input").focus();
+	if(document.getElementById("input").disabled) {
+		return true;
+	}
+	
+	if(event.keyCode == 13) {
+		var inputToSend = document.getElementById("input").value;
+		if(localEcho) {
+			var text = document.createElement("div");
+			text.innerHTML = inputToSend.trim();
+			document.getElementById("output").appendChild(text);
+			commandHistory.push(inputToSend);
+			commandPointer = commandHistory.length;
+		} else {
+			var text = document.createElement("div");
+			text.innerHTML = new Array(inputToSend.length + 1).join("*");
+			document.getElementById("output").appendChild(text);
+		}
+		connection.send(inputToSend);
+		document.getElementById("input").value = "";
+		
+	} else if (event.keyCode == 38) {
+		commandPointer--;
+		commandPointer = Math.max(0, commandPointer);
+		document.getElementById("input").value = commandHistory[commandPointer];
+		document.getElementById("input").setSelectionRange(commandHistory[commandPointer].length, commandHistory[commandPointer].length);
+	} else if (event.keyCode == 40) {
+		commandPointer++;
+		if(commandPointer >= commandHistory.length) {
+			commandPointer = Math.min(commandPointer, commandHistory.length - 1);
+			document.getElementById("input").value = "";
+			return;
+		}
+		commandPointer = Math.min(commandPointer, commandHistory.length - 1);
+		document.getElementById("input").value = commandHistory[commandPointer];
+		document.getElementById("input").setSelectionRange(commandHistory[commandPointer].length, commandHistory[commandPointer].length);
+	}
+}, false);
+
+document.getElementById("input").focus();
+</script>
+</body>
+</html>

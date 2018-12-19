@@ -30,7 +30,10 @@ func _main() error {
 		return err
 	}
 
-	addr := ":4242"
+	// FIXME: make this path more friendly...
+	e.Static("/", "./static/terminal.html")
+
+	addr := ":8080"
 	return e.Start(addr)
 }
 

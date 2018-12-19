@@ -17,6 +17,20 @@ import (
 
 var upgrader websocket.Upgrader
 
+func init() {
+	upgrader.CheckOrigin = func(req *http.Request) bool {
+		// if req.Host == "127.0.0.1" ||
+		// req.Host == "localhost" ||
+		// req.Host == "ingcr3at1on.online" ||
+		// req.Host == "eyeofmidas.net" {
+		// return true
+		// }
+		// FIXME: this is not good
+		return true
+		// return false
+	}
+}
+
 // SetupRoutes sets up the API routes.
 func SetupRoutes(config *config.Config, g *echo.Group) error {
 	if err := config.Validate(); err != nil {
@@ -94,7 +108,7 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 			for {
 				_, byt, err := ws.ReadMessage()
 				if err != nil {
-					errCh <- errors.Wrap(err, "ws.ReadMessage")
+					errCh <- err
 					return
 				}
 
@@ -115,10 +129,17 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		case <-c.Request().Context().Done():
 			break
 		case <-ctx.Done():
+			cancel()
 			break
 		case err := <-errCh:
 			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, err)
+				cancel()
+				if websocket.IsUnexpectedCloseError(
+					err,
+					websocket.CloseGoingAway,
+				) {
+					return echo.NewHTTPError(http.StatusInternalServerError, err)
+				}
 			}
 		}
 
