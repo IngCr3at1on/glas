@@ -114,7 +114,7 @@ function handleInstructions(instruction) {
 	try {
 		console.log(message);
 		var text = document.createElement("div");
-		text.innerHTML = json.data.trim();
+		text.innerHTML = message.trim();
 		document.getElementById("output").appendChild(text);
 		window.scrollTo(0,document.body.scrollHeight);
 	} catch (e) {
