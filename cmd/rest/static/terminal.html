@@ -158,16 +158,33 @@ document.addEventListener("keydown", function(event) {
 	}
 	
 	if(event.keyCode == 13) {
+		buffer = "";
 		var inputToSend = document.getElementById("input").value;
 		if(localEcho) {
+			var active = document.getElementById("active-buffer");
+			var activeInputToSend = "";
+			if(active != null) {
+				activeInputToSend = active.innerHTML;
+				document.getElementById("output").removeChild(document.getElementById("active-buffer"));
+			}
+			activeInputToSend += inputToSend.trim();
 			var text = document.createElement("div");
-			text.innerHTML = inputToSend.trim();
+			text.innerHTML = activeInputToSend;
+			
 			document.getElementById("output").appendChild(text);
 			commandHistory.push(inputToSend);
 			commandPointer = commandHistory.length;
 		} else {
+			var active = document.getElementById("active-buffer");
+			var activeInputToSend = "";
+			if(active != null) {
+				activeInputToSend = active.innerHTML;
+				document.getElementById("output").removeChild(document.getElementById("active-buffer"));
+			}
+			activeInputToSend += inputToSend.trim();
 			var text = document.createElement("div");
-			text.innerHTML = new Array(inputToSend.length + 1).join("*");
+			text.innerHTML = new Array(activeInputToSend.length + 1).join("*");
+
 			document.getElementById("output").appendChild(text);
 		}
 		connection.send(inputToSend);
