@@ -1,12 +1,9 @@
 package internal
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
-	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -19,10 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	upgrader websocket.Upgrader
-	regex    = regexp.MustCompile(`(\\(033|x1b)|)`)
-)
+var upgrader websocket.Upgrader
 
 func init() {
 	upgrader.CheckOrigin = func(req *http.Request) bool {
@@ -81,33 +75,15 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			rbuf := make([]byte, 1)
-			// TODO: consider moving this functionality into glas itself
-			// (instead of part of the API).
-			var wbuf bytes.Buffer
-			readByLine := false
+			rbuf := make([]byte, 1024)
 
 			for {
 				nr, er := outR.Read(rbuf)
 				if nr > 0 {
-					_, err := wbuf.Write(rbuf[:nr])
+					err = ws.WriteMessage(websocket.TextMessage, ansi.ReplaceCodes(rbuf[:nr]))
 					if err != nil {
 						errCh <- err
 						return
-					}
-
-					if regex.MatchString(wbuf.String()) {
-						readByLine = true
-					}
-
-					if readByLine && strings.Contains(wbuf.String(), "\r\n") || !readByLine {
-						err = ws.WriteMessage(websocket.TextMessage, ansi.ReplaceCodes(wbuf.Bytes()))
-						if err != nil {
-							errCh <- err
-							return
-						}
-
-						wbuf.Reset()
 					}
 
 					continue
