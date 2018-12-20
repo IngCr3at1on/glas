@@ -1,39 +1,70 @@
 package ansi
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 )
 
-var colors map[Code][]byte
+var colors map[Code]string
+
+const (
+	placeholder = `$placeholder$`
+	separator   = `$separator$`
+	blank       = `$blank$`
+)
 
 func init() {
-	colors = make(map[Code][]byte)
-	colors[White] = []byte(`#FFFFFF`)
-	colors[Black] = []byte(`#000000`)
-	colors[Grey] = []byte(`#808080`)
-	colors[Red] = []byte(`#FF0000`)
-	colors[Green] = []byte(`#008000`)
-	colors[Blue] = []byte(`#0000FF`)
-	colors[Yellow] = []byte(`#FFFF00`)
-	colors[Magenta] = []byte(`#FF00FF`)
-	colors[Cyan] = []byte(`#00FFFF`)
+	colors = make(map[Code]string)
+	// colors[White] = placeholder + `#FFFFFF` + separator
+	colors[White] = blank
+	colors[Black] = placeholder + `#000000` + separator
+	colors[Grey] = placeholder + `#808080` + separator
+	colors[Red] = placeholder + `#FF0000` + separator
+	colors[Green] = placeholder + `#008000` + separator
+	colors[Blue] = placeholder + `#0000FF` + separator
+	colors[Yellow] = placeholder + `#FFFF00` + separator
+	colors[Magenta] = placeholder + `#FF00FF` + separator
+	colors[Cyan] = placeholder + `#00FFFF` + separator
 }
 
-func ReplaceCodes(b []byte) []byte {
-	return regex.ReplaceAllFunc(b, replacer)
+func ReplaceCodes(byt []byte) []byte {
+	_s := regex.ReplaceAllStringFunc(string(byt), replacer)
+	_fields := strings.Split(_s, placeholder)
+	var fields []string
+	for _, f := range _fields {
+		fields = append(fields, strings.Split(f, blank)...)
+	}
+
+	final := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if strings.Contains(f, separator) {
+			var b strings.Builder
+			fmt.Fprint(&b, `<font color=`, strings.Replace(f, separator, ">", -1), `</font>`)
+			if suffix := "\r\n"; strings.HasSuffix(f, suffix) {
+				b.WriteString(suffix)
+			}
+
+			f = b.String()
+		}
+
+		final = append(final, f)
+	}
+
+	return []byte(strings.Join(final, ""))
 }
 
-func replacer(b []byte) []byte {
-	fields := regex.FindStringSubmatch(string(b))
+func replacer(s string) string {
+	fields := regex.FindStringSubmatch(s)
 	n, err := strconv.Atoi(fields[len(fields)-1])
 	if err != nil {
-		return b
+		return s
 	}
 
 	color, ok := colors[Code(n)]
 	if !ok {
 		// Strip non-convertable codes
-		return nil
+		return ""
 	}
 
 	return color
