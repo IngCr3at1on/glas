@@ -20,6 +20,11 @@ body {
 	white-space: pre-wrap;
 	padding: 8px;
 }
+#output div {
+	/*display: inline;*/
+	white-space: pre-wrap;
+}
+
 #input {
 	font-family: 'Inconsolata', monospace;
 	background-color: black;
@@ -108,17 +113,34 @@ function handleInstructions(instruction) {
   connection.onerror = function (error) {
   	console.error("Connection Error:", error);
   };
-
+var buffer = "";
   connection.onmessage = function (message) {
 	  // FIXME: yeah I totally broke any and all safety here :P
-	try {
-		console.log(message);
-		var text = document.createElement("div");
-		text.innerHTML = message.data.trim();
-		document.getElementById("output").appendChild(text);
-		window.scrollTo(0,document.body.scrollHeight);
+
+	  if(document.getElementById("active-buffer") == null) {
+	  	var active = document.createElement("div");
+	  	active.id = "active-buffer";
+	  	document.getElementById("output").appendChild(active);
+	  }
+	  var char = message.data.charCodeAt(0);
+		try {
+		buffer += message.data;
+		if(char == 13 || message.data.indexOf("\n") != -1) {
+			var text = document.createElement("div");
+			text.innerHTML = buffer.trim();
+			document.getElementById("output").appendChild(text);
+			window.scrollTo(0,document.body.scrollHeight);
+			buffer = "";
+			document.getElementById("output").removeChild(document.getElementById("active-buffer"));
+		}
+		if(buffer != "") {
+			var active = document.getElementById("active-buffer");
+			active.innerHTML += message.data;
+			window.scrollTo(0,document.body.scrollHeight);
+		}
+		
 	} catch (e) {
-		console.error("This doesn't look like a valid JSON ", message.data);
+		console.error("This doesn't look like a valid JSON ", e, message.data);
 		return;
 	}
 	// handle incoming message
