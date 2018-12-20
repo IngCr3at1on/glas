@@ -39,9 +39,11 @@ func ReplaceCodes(byt []byte) []byte {
 	final := make([]string, 0, len(fields))
 	for _, f := range fields {
 		if strings.Contains(f, separator) {
+			f = strings.Replace(f, separator, `;">`, -1)
 			var b strings.Builder
-			fmt.Fprint(&b, `<font color=`, strings.Replace(f, separator, ">", -1), `</font>`)
-			if suffix := "\r\n"; strings.HasSuffix(f, suffix) {
+			const suffix = "\r\n"
+			fmt.Fprint(&b, `<span style="color:`, strings.TrimSuffix(f, suffix), `</span>`)
+			if strings.HasSuffix(f, suffix) {
 				b.WriteString(suffix)
 			}
 
