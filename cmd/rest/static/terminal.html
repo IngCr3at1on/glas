@@ -113,14 +113,10 @@ function handleInstructions(instruction) {
 	  // FIXME: yeah I totally broke any and all safety here :P
 	try {
 		console.log(message);
-		// var json = JSON.parse(message.data);
-		// if(json.type == "output") {
-			// var text = document.createElement("div");
-			var text = document.createTextNode(message.data);
-			// text.innerHTML = json.data.trim();
-			document.getElementById("output").appendChild(text);
-			window.scrollTo(0,document.body.scrollHeight);
-		// }
+		var text = document.createElement("div");
+		text.innerHTML = json.data.trim();
+		document.getElementById("output").appendChild(text);
+		window.scrollTo(0,document.body.scrollHeight);
 	} catch (e) {
 		console.error("This doesn't look like a valid JSON ", message.data);
 		return;
