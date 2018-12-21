@@ -85,8 +85,6 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 						errCh <- err
 						return
 					}
-
-					continue
 				}
 				if er != nil {
 					if er != io.EOF {
