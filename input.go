@@ -11,35 +11,27 @@ func (g *Glas) routineHandleInput(ctx context.Context, cancel context.CancelFunc
 
 	errCh := make(chan error, 1)
 	go func() {
-		rbuf := make([]byte, 1024)
 		for {
-			nr, er := g.config.Input.Read(rbuf)
-			if nr > 0 {
-				byt := rbuf[:nr]
-				b, err := g.handleInput(cancel, string(byt))
+			in := <-g.config.Input
+			if in != nil {
+				b, err := g.handleInput(cancel, in.Data)
 				if err != nil {
 					errCh <- err
 					return
 				}
 
 				if !b && g.connected {
-					nw, err := g.pipeW.Write(byt)
+					nw, err := g.pipeW.Write([]byte(in.Data))
 					if err != nil {
 						errCh <- err
 						return
 					}
 
-					if nw != len(byt) {
+					if nw != len(in.Data) {
 						errCh <- io.ErrShortWrite
 						return
 					}
 				}
-			}
-			if er != nil {
-				if er != io.EOF {
-					errCh <- er
-				}
-				break
 			}
 		}
 	}()

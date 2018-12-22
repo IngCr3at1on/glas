@@ -3,7 +3,7 @@ package internal
 import (
 	"bytes"
 	"context"
-	"io"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -59,10 +59,9 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		}
 		defer ws.Close()
 
-		inR, inW := io.Pipe()
-
 		var wg sync.WaitGroup
 		errCh := make(chan error, 1)
+		inCh := make(chan *pb.Input)
 		outCh := make(chan *pb.Output)
 
 		// Read from Glas.
@@ -92,7 +91,7 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		}()
 
 		g, err := glas.New(&glas.Config{
-			Input:  inR,
+			Input:  inCh,
 			Output: outCh,
 		})
 		if err != nil {
@@ -120,16 +119,15 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 					return
 				}
 
-				w, err := inW.Write(byt)
+				var in pb.Input
+				err = jsonpb.Unmarshal(bytes.NewReader(byt), &in)
 				if err != nil {
+					fmt.Println(err)
 					errCh <- err
 					return
 				}
 
-				if w != len(byt) {
-					errCh <- io.ErrShortWrite
-					return
-				}
+				inCh <- &in
 			}
 		}()
 

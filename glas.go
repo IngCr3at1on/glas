@@ -75,7 +75,7 @@ func (g *Glas) Start(ctx context.Context, cancel context.CancelFunc) error {
 
 	g.config.Output <- &pb.Output{Data: welcome}
 	// Add help and mention it here...
-	g.config.Output <- &pb.Output{Data: fmt.Sprintf("The current command prefix is '%s'\n", g.config.CmdPrefix)}
+	g.config.Output <- &pb.Output{Data: fmt.Sprintf("\n\nThe current command prefix is '%s'\n", g.config.CmdPrefix)}
 
 	var wg sync.WaitGroup
 

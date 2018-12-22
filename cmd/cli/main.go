@@ -25,16 +25,13 @@ func _main() error {
 		cancel()
 	}()
 
-	inR, inW := io.Pipe()
-
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
+	inCh := make(chan *pb.Input)
 	outCh := make(chan *pb.Output)
 
-	wg.Add(1)
+	// Don't put this in our waitgroup, it will never finish.
 	go func() {
-		defer wg.Done()
-
 		for {
 			out := <-outCh
 			if out != nil {
@@ -53,7 +50,7 @@ func _main() error {
 	}()
 
 	g, err := glas.New(&glas.Config{
-		Input:  inR,
+		Input:  inCh,
 		Output: outCh,
 	})
 	if err != nil {
@@ -75,15 +72,8 @@ func _main() error {
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			nw, err := inW.Write(scanner.Bytes())
-			if err != nil {
-				errCh <- err
-				return
-			}
-
-			if nw != len(scanner.Bytes()) {
-				errCh <- io.ErrShortWrite
-				return
+			inCh <- &pb.Input{
+				Data: scanner.Text(),
 			}
 		}
 
