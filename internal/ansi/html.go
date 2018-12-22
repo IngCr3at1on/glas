@@ -2,30 +2,35 @@ package ansi
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
-var colors map[Code]string
+var codes map[Code]string
 
 const (
+	// Instruction is prepended to instruction codes.
+	Instruction = `$instruction$`
+	// Separator is used to separating instructions from normal data.
+	Separator = `$separator$`
+
 	placeholder = `$placeholder$`
-	separator   = `$separator$`
+	separator   = `$separator2$`
 	blank       = `$blank$`
 )
 
 func init() {
-	colors = make(map[Code]string)
-	// colors[White] = placeholder + `#FFFFFF` + separator
-	colors[White] = blank
-	colors[Black] = placeholder + `#000000` + separator
-	colors[Grey] = placeholder + `#808080` + separator
-	colors[Red] = placeholder + `#FF0000` + separator
-	colors[Green] = placeholder + `#008000` + separator
-	colors[Blue] = placeholder + `#0000FF` + separator
-	colors[Yellow] = placeholder + `#FFFF00` + separator
-	colors[Magenta] = placeholder + `#FF00FF` + separator
-	colors[Cyan] = placeholder + `#00FFFF` + separator
+	codes = make(map[Code]string)
+	// codes[White] = placeholder + `#FFFFFF` + separator
+	codes[White] = blank
+	codes[Black] = placeholder + `#000000` + separator
+	codes[Grey] = placeholder + `#808080` + separator
+	codes[Red] = placeholder + `#FF0000` + separator
+	codes[Green] = placeholder + `#008000` + separator
+	codes[Blue] = placeholder + `#0000FF` + separator
+	codes[Yellow] = placeholder + `#FFFF00` + separator
+	codes[Magenta] = placeholder + `#FF00FF` + separator
+	codes[Cyan] = placeholder + `#00FFFF` + separator
+	codes[EraseScreen] = placeholder + Instruction + `ERASESCREEN` + Separator
 }
 
 func ReplaceCodes(s string) string {
@@ -58,16 +63,17 @@ func ReplaceCodes(s string) string {
 
 func replacer(s string) string {
 	fields := regex.FindStringSubmatch(s)
-	n, err := strconv.Atoi(fields[len(fields)-1])
-	if err != nil {
+
+	// See comment in ansi.go...
+	if len(fields) != 7 {
 		return s
 	}
 
-	color, ok := colors[Code(n)]
+	code, ok := codes[Code(strings.TrimSuffix(fields[5], "m"))]
 	if !ok {
 		// Strip non-convertable codes
 		return ""
 	}
 
-	return color
+	return code
 }

@@ -119,7 +119,11 @@ function handleInstructions(instruction) {
 		var json = JSON.parse(message.data)
 
 		var text
-		if (json.data.indexOf("\n") >= 0) {
+		if (json.type == "INSTRUCTION") {
+			// FIXME: handle instructions:
+			// ERASESCREEN
+		} else if (json.data.indexOf("\n") >= 0) { // FIXME: figure out why when I change this it suddenly adds extra new lines
+		// if (json.type == "BUFFERED") {
 			text = document.createElement("span");
 			text.innerHTML = json.data;
 		} else {

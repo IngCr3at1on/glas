@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -72,17 +73,35 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 			for {
 				out := <-outCh
 				if out != nil {
+					// FIXME: I really don't like this way of breaking out ANSI instructions
+					// into something to pass over the websocket...
 					out.Data = ansi.ReplaceCodes(out.Data)
+					if strings.HasPrefix(out.Data, ansi.Instruction) {
+						out.Type = pb.Output_INSTRUCTION
+						fields := strings.Split(out.Data, ansi.Separator)
+						out.Data = strings.TrimPrefix(fields[0], ansi.Instruction)
 
-					m := new(jsonpb.Marshaler)
-					var buf bytes.Buffer
-					if err := m.Marshal(&buf, out); err != nil {
-						errCh <- err
-						return
+						if err := send(ws, out); err != nil {
+							errCh <- err
+							return
+						}
+
+						if len(fields) > 1 {
+							for _, f := range fields[1:] {
+								if err := send(ws, &pb.Output{
+									Type: pb.Output_BUFFERED,
+									Data: f,
+								}); err != nil {
+									errCh <- err
+									return
+								}
+							}
+						}
+
+						continue
 					}
 
-					err = ws.WriteMessage(websocket.TextMessage, buf.Bytes())
-					if err != nil {
+					if err := send(ws, out); err != nil {
 						errCh <- err
 						return
 					}
@@ -156,4 +175,14 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		wg.Wait()
 		return c.NoContent(http.StatusOK)
 	}
+}
+
+func send(ws *websocket.Conn, out *pb.Output) error {
+	m := new(jsonpb.Marshaler)
+	var buf bytes.Buffer
+	if err := m.Marshal(&buf, out); err != nil {
+		return err
+	}
+
+	return ws.WriteMessage(websocket.TextMessage, buf.Bytes())
 }
