@@ -18,7 +18,7 @@ func TestHTML(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		a := ReplaceCodes([]byte(tc.d))
-		test.Equals(t, tc.e, string(a))
+		a := ReplaceCodes(tc.d)
+		test.Equals(t, tc.e, a)
 	}
 }

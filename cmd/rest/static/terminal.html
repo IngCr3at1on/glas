@@ -116,12 +116,14 @@ function handleInstructions(instruction) {
 
   connection.onmessage = function (message) {
 	try {
+		var json = JSON.parse(message.data)
+
 		var text
-		if (message.data.indexOf("\n") >= 0) {
+		if (json.data.indexOf("\n") >= 0) {
 			text = document.createElement("span");
-			text.innerHTML = message.data;
+			text.innerHTML = json.data;
 		} else {
-			text = document.createTextNode(message.data);
+			text = document.createTextNode(json.data);
 		}
 		document.getElementById("output").appendChild(text);
 		window.scrollTo(0,document.body.scrollHeight);

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package glas.proto;
+option go_package = "proto";
+
+// Input contains client input.
+message Input {
+    string data     = 1;
+    bool protected  = 2;
+}
+
+// Output contains server output.
+message Output {
+    enum Type {
+        UNBUFFERED  = 0;
+        BUFFERED    = 1;
+    }
+
+    string data     = 1;
+    Type type       = 2;
+}

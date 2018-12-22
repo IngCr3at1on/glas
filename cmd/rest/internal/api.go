@@ -1,15 +1,18 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"sync"
 
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gorilla/websocket"
 	"github.com/ingcr3at1on/glas"
 	"github.com/ingcr3at1on/glas/cmd/rest/config"
 	"github.com/ingcr3at1on/glas/internal/ansi"
+	pb "github.com/ingcr3at1on/glas/proto"
 	"github.com/justanotherorganization/l5424"
 	"github.com/justanotherorganization/l5424/x5424"
 	"github.com/labstack/echo"
@@ -57,43 +60,46 @@ func makeConnectHandler(cfg *config.Config) echo.HandlerFunc {
 		defer ws.Close()
 
 		inR, inW := io.Pipe()
-		outR, outW := io.Pipe()
-
-		g, err := glas.New(&glas.Config{
-			Input:  inR,
-			Output: outW,
-		})
-		if err != nil {
-			return err
-		}
 
 		var wg sync.WaitGroup
 		errCh := make(chan error, 1)
-		ctx, cancel := context.WithCancel(c.Request().Context())
+		outCh := make(chan *pb.Output)
 
 		// Read from Glas.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			rbuf := make([]byte, 1024)
 
 			for {
-				nr, er := outR.Read(rbuf)
-				if nr > 0 {
-					err = ws.WriteMessage(websocket.TextMessage, ansi.ReplaceCodes(rbuf[:nr]))
+				out := <-outCh
+				if out != nil {
+					out.Data = ansi.ReplaceCodes(out.Data)
+
+					m := new(jsonpb.Marshaler)
+					var buf bytes.Buffer
+					if err := m.Marshal(&buf, out); err != nil {
+						errCh <- err
+						return
+					}
+
+					err = ws.WriteMessage(websocket.TextMessage, buf.Bytes())
 					if err != nil {
 						errCh <- err
 						return
 					}
 				}
-				if er != nil {
-					if er != io.EOF {
-						errCh <- er
-					}
-					break
-				}
 			}
 		}()
+
+		g, err := glas.New(&glas.Config{
+			Input:  inR,
+			Output: outCh,
+		})
+		if err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithCancel(c.Request().Context())
 
 		wg.Add(1)
 		go func() {

@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/ingcr3at1on/glas"
+	pb "github.com/ingcr3at1on/glas/proto"
 )
 
 // Wrap our functionality to allow defer to work with exit.
@@ -26,16 +27,38 @@ func _main() error {
 
 	inR, inW := io.Pipe()
 
+	var wg sync.WaitGroup
+	errCh := make(chan error, 1)
+	outCh := make(chan *pb.Output)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		for {
+			out := <-outCh
+			if out != nil {
+				n, err := os.Stdout.WriteString(out.Data)
+				if err != nil {
+					errCh <- err
+					return
+				}
+
+				if n != len(out.Data) {
+					errCh <- io.ErrShortWrite
+					return
+				}
+			}
+		}
+	}()
+
 	g, err := glas.New(&glas.Config{
 		Input:  inR,
-		Output: os.Stdout,
+		Output: outCh,
 	})
 	if err != nil {
 		return err
 	}
-
-	var wg sync.WaitGroup
-	errCh := make(chan error, 1)
 
 	wg.Add(1)
 	go func() {

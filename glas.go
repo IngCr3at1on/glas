@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ingcr3at1on/glas/internal"
+	pb "github.com/ingcr3at1on/glas/proto"
 	"github.com/pkg/errors"
 	telnet "github.com/reiver/go-telnet"
 )
@@ -72,9 +73,9 @@ func (g *Glas) Start(ctx context.Context, cancel context.CancelFunc) error {
 		return ErrNilCancelF
 	}
 
-	fmt.Fprintln(g.config.Output, welcome)
+	g.config.Output <- &pb.Output{Data: welcome}
 	// Add help and mention it here...
-	fmt.Fprintf(g.config.Output, "The current command prefix is '%s'\n", g.config.CmdPrefix)
+	g.config.Output <- &pb.Output{Data: fmt.Sprintf("The current command prefix is '%s'\n", g.config.CmdPrefix)}
 
 	var wg sync.WaitGroup
 
@@ -98,14 +99,7 @@ func (g *Glas) Start(ctx context.Context, cancel context.CancelFunc) error {
 		}
 	case err := <-g.terrCh:
 		if err != nil {
-			n, _err := io.WriteString(g.config.Output, fmt.Sprintf("%s\n", err.Error()))
-			if _err != nil {
-				return _err
-			}
-
-			if n < len(err.Error()) {
-				return io.ErrShortWrite
-			}
+			g.config.Output <- &pb.Output{Data: fmt.Sprintf("%s\n", err.Error())}
 		}
 	}
 

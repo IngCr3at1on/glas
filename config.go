@@ -2,6 +2,8 @@ package glas
 
 import (
 	"io"
+
+	pb "github.com/ingcr3at1on/glas/proto"
 )
 
 const (
@@ -13,8 +15,8 @@ type (
 	Config struct {
 		// Input is an input io.Reader (os.Stdin for example).
 		Input io.Reader
-		// Output is an output io.Writer (os.Stdout for example).
-		Output io.Writer
+		// Output is the channel to return output messages on.
+		Output chan *pb.Output
 		// CmdPrefix is the prefix used for client commands, by default this
 		// is `/`.
 		CmdPrefix string

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	pb "github.com/ingcr3at1on/glas/proto"
 	"github.com/pkg/errors"
 	telnet "github.com/reiver/go-telnet"
 )
@@ -13,13 +14,13 @@ import (
 type (
 	// CallerConfig is a Caller configuration.
 	CallerConfig struct {
-		Out io.Writer
+		Out chan *pb.Output
 		In  io.Reader
 	}
 
 	// Caller implements the telnet.Caller interface.
 	Caller struct {
-		out   io.Writer
+		out   chan *pb.Output
 		in    io.Reader
 		errCh chan error
 	}
@@ -101,16 +102,15 @@ func (c *Caller) read(r telnet.Reader) {
 			}
 
 			if readLine && strings.Contains(wbuf.String(), "\r\n") || !readLine {
-				nw, err := c.out.Write(wbuf.Bytes())
-				if err != nil {
-					c.errCh <- err
-					return
+				out := pb.Output{
+					Data: wbuf.String(),
 				}
 
-				if nw != wbuf.Len() {
-					c.errCh <- io.ErrShortWrite
-					return
+				if readLine {
+					out.Type = pb.Output_BUFFERED
 				}
+
+				c.out <- &out
 
 				wbuf.Reset()
 				readLine = false

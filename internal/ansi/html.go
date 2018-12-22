@@ -28,8 +28,8 @@ func init() {
 	colors[Cyan] = placeholder + `#00FFFF` + separator
 }
 
-func ReplaceCodes(byt []byte) []byte {
-	_s := regex.ReplaceAllStringFunc(string(byt), replacer)
+func ReplaceCodes(s string) string {
+	_s := regex.ReplaceAllStringFunc(s, replacer)
 	_fields := strings.Split(_s, placeholder)
 	var fields []string
 	for _, f := range _fields {
@@ -53,7 +53,7 @@ func ReplaceCodes(byt []byte) []byte {
 		final = append(final, f)
 	}
 
-	return []byte(strings.Join(final, ""))
+	return strings.Join(final, "")
 }
 
 func replacer(s string) string {
